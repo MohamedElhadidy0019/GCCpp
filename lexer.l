@@ -31,6 +31,7 @@ const       return CONSTANT;
 void        return VOID;
 return      return RETURN;
 
+enum        return ENUM;
 
 
 "=="          return EQUAL;
