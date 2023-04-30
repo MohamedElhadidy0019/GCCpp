@@ -46,6 +46,7 @@ void yyerror(char *s);
 %right'!' '&' 
 %precedence '(' ')' '{' '}'
 
+
 /* Define grammar rules */
 %start program
 
@@ -61,17 +62,21 @@ statements: statement
 statement: declaration ';'
     | assignment ';'
     | expression ';'
-	| if_statement 
 	| do_while_statement ';' 
+	| if_statement 
 	| while_statement 
 	| for_statement 
 	| switch_statement    
 	| function  
+	| return_statement ';'
     | print_statement ';'
     | block    
 	;  
 
 
+return_statement : RETURN expression
+	| RETURN 
+	;
 
 declaration: variable_declaration 
     | enum_declaration
@@ -98,7 +103,7 @@ assignment : IDENTIFIER '=' expression
 
 expression: math_expression
 	| logical_expression 
-	| '(' expression_statement ')'
+	| '(' expression ')'
 	| function_call
 	;
 
@@ -142,8 +147,12 @@ logical_expression:  '!' expression
 	| expression NOT_EQUAL expression
     ;
 
-while_statement: while_declaraction  loop_block_statement 
-	| while_declaraction loop_statement
+while_statement: while_declaraction  block 
+	| while_declaraction block_statement
+
+while_declaraction : WHILE '(' logical_expression ')' 
+	;
+
 
 block : '{' block_statements '}'
 	;
@@ -154,49 +163,78 @@ block_statements : block_statement
 block_statement : declaration ';'
         | assignment ';'
         | expression ';'		
-		| if_statement 
 		| do_while_statement ';' 
+		| if_statement 
 		| while_statement 
 		| for_statement 
 		| switch_statement  
+		| return_statement ';'
         | print_statement ';'
         | CONTINUE ';'
 		| BREAK ';'
         ;  
-		 
-// we need to having continue and break inside an if inside a loop
-if_statement: if_condition block
-	| if_condition block_statement
+
+print_statement : PRINT '(' argument_print ')'
+	;
+argument_print: argument_print ',' expression
+			| expression
+			;
+
+
+for_statement: for_declaration  block 
+	| for_declaration block_statement
 	;
 
-if_condition : IF '('logical_expression')'
-			 ;
+for_declaration: FOR '(' variable_declaration  ';' logical_expression  ';' expression ')'
+	;
 
-else_statement : ELSE block_statement
-	       | ELSE block
-	       | ';'
+do_while_statement : DO  block while_declaraction
+		    | DO  block_statement while_declaraction
+			;
 
-
-
-
+switch_statement : SWITCH '('expression')' '{' case_statement '}'
 
 
+case_statement : CASE value ':' block case_statement 
+		| DEFAULT ':' block 
+		;
+
+
+arguments: arguments ',' argument 
+	| argument 
+	| %empty
+	;
+
+argument : data_type IDENTIFIER
+	| data_type IDENTIFIER '=' expression
+	;
+	
+function : VOID IDENTIFIER '(' arguments')'  block 
+	|  data_type IDENTIFIER  '(' arguments')'  block 
+	;
+
+function_call: IDENTIFIER '('argument_call')' 
+	;
+
+argument_call: argument_call ',' expression
+			| expression
+			| %empty
+			;
 
 
 
+// we need to having continue and break inside an if inside a loop
 
+if_statement: if_condition block_statement else_statement    
+	| if_condition block else_statement 
+	;
 
+if_condition : IF '(' logical_expression ')' 
+	;
 
-
-
-
-
-
+else_statement : ELSE block
+	       | ELSE block_statement         
+		   | %empty
+		   ;
 
 %%
-
-
-
-
-
-
