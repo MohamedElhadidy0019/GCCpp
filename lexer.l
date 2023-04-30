@@ -44,22 +44,23 @@ return      return RETURN;
 "&&"          return AND;
 "||"          return OR;
 
+"print"       return PRINT;
 
 
 
 [-+*/%<>!{}&(),:;=]                         return *yytext; 
 
-true                                        yylval=1; return BOOLEAN_TYPE;
-false                                       yylval=0; return BOOLEAN_TYPE;
+true                                        yylval.boolean_value=1; return BOOLEAN_TYPE;
+false                                       yylval.boolean_value=0; return BOOLEAN_TYPE;
 
-[0-9]+                                      yylval=atoi(yytext); return INTEGER_TYPE;
-[0-9]*\.[0-9]+                              yylval=atof(yytext); return FLOAT_TYPE;
+[0-9]+                                      yylval.integer_value=atoi(yytext); return INTEGER_TYPE;
+[0-9]*\.[0-9]+                              yylval.float_value=atof(yytext); return FLOAT_TYPE;
 
-['][a-zA-Z][']                              yylval=yytext[1]; return CHARACTER_TYPE;
+['][a-zA-Z][']                              yylval.char_value=yytext[1]; return CHARACTER_TYPE;
 
-\"[^"]*\"                                   return STRING_TYPE; //TODO: need to handel yyval here
+\"[^"]*\"                                   yylval.string_value=strdup(yytext+1); yylval.string_value[strlen(yytext)-1]='\0'; return STRING_TYPE;
 
-[a-zA-Z\_][0-9a-zA-Z\_]*                    return IDENTIFIER;  //TODO: need to handel yyval here
+[a-zA-Z\_][0-9a-zA-Z\_]*                    yylval.identifier=strdup(yytext); return IDENTIFIER;
 
 \/\*[^*]*\*\/                                               ; // ignore comments
 
