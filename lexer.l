@@ -3,6 +3,7 @@
     #include <string.h> 
     #include "parser.tab.h"
     void yyerror(char *s);
+    int yylex();
 %}
 
 %%
@@ -49,7 +50,7 @@ enum        return ENUM;
 
 
 
-[-+*/%<>!{}&(),;=]                         return *yytext; 
+[-+*/%<>!{}&(),:;=]                         return *yytext; 
 
 true                                        yylval.boolean_value=1; return BOOLEAN_TYPE;
 false                                       yylval.boolean_value=0; return BOOLEAN_TYPE;

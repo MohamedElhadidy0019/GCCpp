@@ -1,8 +1,11 @@
 %{
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 void yyerror(char *s);
+int yylex();
+int yyparse();
 
 %}
 
@@ -34,6 +37,8 @@ void yyerror(char *s);
 %token AND OR
 %token PRINT
 
+%nonassoc IFX
+%nonassoc ELSE
 /* Define operator precedence and associativity */
 %left ','
 %right '='
@@ -63,7 +68,10 @@ statement: declaration ';'
     | assignment ';'
     | expression ';'
 	| do_while_statement ';' 
-	| if_statement 
+	| if_condition block_statement  %prec IFX
+	| if_condition block            %prec IFX        // if () else
+	| if_condition block_statement else_statement
+	| if_condition block else_statement
 	| while_statement 
 	| for_statement 
 	| switch_statement    
@@ -164,7 +172,10 @@ block_statement : declaration ';'
         | assignment ';'
         | expression ';'		
 		| do_while_statement ';' 
-		| if_statement 
+		| if_condition block_statement    %prec IFX             // |if(true) x=5; else| x=6;
+		| if_condition block              %prec IFX
+		| if_condition block_statement else_statement
+		| if_condition block else_statement
 		| while_statement 
 		| for_statement 
 		| switch_statement  
@@ -197,6 +208,7 @@ switch_statement : SWITCH '('expression')' '{' case_statement '}'
 
 case_statement : CASE value ':' block case_statement 
 		| DEFAULT ':' block 
+		| %empty
 		;
 
 
@@ -224,17 +236,20 @@ argument_call: argument_call ',' expression
 
 
 // we need to having continue and break inside an if inside a loop
-
-if_statement: if_condition block_statement else_statement    
-	| if_condition block else_statement 
-	;
-
-if_condition : IF '(' logical_expression ')' 
+if_condition : IF '(' logical_expression ')'         
 	;
 
 else_statement : ELSE block
 	       | ELSE block_statement         
-		   | %empty
 		   ;
 
 %%
+
+void yyerror(char *s) {
+    fprintf(stdout, "%s\n", s);
+}
+
+int main(void) {
+	return yyparse();
+}
+
