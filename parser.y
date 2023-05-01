@@ -197,6 +197,7 @@ for_statement: for_declaration  block
 	;
 
 for_declaration: FOR '(' variable_declaration  ';' logical_expression  ';' expression ')'
+	            | FOR '(' variable_declaration  ';' logical_expression  ';' assignment ')'
 	;
 
 do_while_statement : DO  block while_declaraction
