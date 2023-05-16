@@ -57,14 +57,14 @@ int yyparse();
 
 %%
 
-program: statements    
+program: block_statements    
 	;
 
-statements: statement 
+/* statements: statement 
 	| statements statement 
-	;
+	; */
 
-statement: declaration ';'
+/* statement: declaration ';'
     | assignment ';'
     | expression ';'
 	| do_while_statement ';' 
@@ -79,8 +79,30 @@ statement: declaration ';'
 	| return_statement ';'
     | print_statement ';'
     | block    
-	;  
+	;   */
 
+block_statements : block_statement
+		  | block_statements block_statement
+
+block_statement : declaration ';'
+        | expression ';'		
+		| do_while_statement ';' 
+		| if_condition block_statement    %prec IFX             // |if(true) x=5; else| x=6;
+		| if_condition block              %prec IFX
+		| if_condition block_statement else_statement
+		| if_condition block else_statement
+		| while_statement 
+		| for_statement 
+		| switch_statement  
+		| function
+		| return_statement ';'
+        | print_statement ';'
+        | CONTINUE ';'
+		| BREAK ';'
+        ;
+
+block : '{' block_statements '}'
+	;
 
 return_statement : RETURN expression
 	| RETURN 
@@ -107,12 +129,13 @@ enum_item: IDENTIFIER '=' INTEGER_TYPE
     ;
 
 assignment : IDENTIFIER '=' expression
-    ;
+    ; 
 
 expression: math_expression
 	| logical_expression 
 	| '(' expression ')'
 	| function_call
+	| assignment
 	;
 
 // we need to handle negative numbers in math_expression
@@ -162,28 +185,7 @@ while_declaraction : WHILE '(' logical_expression ')'
 	;
 
 
-block : '{' block_statements '}'
-	;
-
-block_statements : block_statement
-		  | block_statements block_statement
-
-block_statement : declaration ';'
-        | assignment ';'
-        | expression ';'		
-		| do_while_statement ';' 
-		| if_condition block_statement    %prec IFX             // |if(true) x=5; else| x=6;
-		| if_condition block              %prec IFX
-		| if_condition block_statement else_statement
-		| if_condition block else_statement
-		| while_statement 
-		| for_statement 
-		| switch_statement  
-		| return_statement ';'
-        | print_statement ';'
-        | CONTINUE ';'
-		| BREAK ';'
-        ;  
+  
 
 print_statement : PRINT '(' argument_print ')'
 	;
@@ -197,7 +199,7 @@ for_statement: for_declaration  block
 	;
 
 for_declaration: FOR '(' variable_declaration  ';' logical_expression  ';' expression ')'
-	            | FOR '(' variable_declaration  ';' logical_expression  ';' assignment ')'
+				| FOR '(' assignment  ';' logical_expression  ';' expression ')'
 	;
 
 do_while_statement : DO  block while_declaraction
