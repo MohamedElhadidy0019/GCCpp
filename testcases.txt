@@ -1,4 +1,4 @@
 
-int add (int x, int y) {
-    return x + y
-}
+int x;
+int x = 5;
+const float x = 0.05;
