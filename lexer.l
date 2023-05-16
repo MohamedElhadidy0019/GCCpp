@@ -4,6 +4,8 @@
     #include "parser.tab.h"
     void yyerror(char *s);
     int yylex();
+
+    extern FILE* yyin;
 %}
 
 %%
@@ -75,4 +77,32 @@ false                                       yylval.boolean_value=0; return BOOLE
 
 int yywrap(void) {
     return 1;
+}
+
+int main(int argc, char* argv[]) {
+    FILE* inputFile;
+
+    // Check if a file name is provided as a command-line argument
+    if (argc < 2) {
+        fprintf(stderr, "Error: No input file provided.\n");
+        return 1;
+    }
+
+    // Open the input file for reading
+    inputFile = fopen(argv[1], "r");
+    if (inputFile == NULL) {
+        fprintf(stderr, "Error: Failed to open input file.\n");
+        return 1;
+    }
+
+    // Set the input file for the parser to read from
+    yyin = inputFile;
+
+    // Call the parser
+    yyparse();
+
+    // Close the input file
+    fclose(inputFile);
+
+    return 0;
 }

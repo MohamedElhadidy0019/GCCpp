@@ -1753,7 +1753,3 @@ void yyerror(char *s) {
     fprintf(stdout, "%s\n", s);
 }
 
-int main(void) {
-	return yyparse();
-}
-
