@@ -1,4 +1,9 @@
 
 int x;
-int x = 5;
-const float x = 0.05;
+
+int y = 1 + 5;
+float z = 2.0 / 2;
+char r = 'r' + 'x';
+const int y = 2.0 + 1;
+string s = "ahmed";
+string x = "ahmed" + "sayed";

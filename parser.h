@@ -6,24 +6,10 @@ typedef struct
     struct nodeTypeTag *op[2]; /* operands (expandable) */
 } oprNodeType;
 
-typedef struct nodeTypeTag
-{
-    int type;
-    int kind;
-    char *name;
-    int scope;
-    int isUsed;
-    void *value;
-    union
-    {
-        oprNodeType opr;
-    };
-} nodeType;
-
 typedef struct valueNodes
 {
     int type;
-    int used;
+    int kind;
     union
     {
         int integer;
@@ -33,3 +19,15 @@ typedef struct valueNodes
         char *name;
     };
 } valueNode;
+
+
+
+struct STNode
+{
+    int type;
+    int kind;
+    char *name;
+    int scope;
+    int isUsed;
+    valueNode *value;
+};

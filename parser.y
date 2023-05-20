@@ -15,34 +15,49 @@ int yyparse();
 #define typeBoolean 3
 #define typeCharchter 4
 #define typeString 5
+
 #define identifierKind 1
 #define constantKind 2
-#define constantValueKind 5
 #define functionKind 3
 
-void addToSymbolTable(char* name , int type, int kind);
-int inTable(char* name);
+#define valueMismatch 1
+#define constValueMismatch 2
+#define ifCondBoolErr 3
+#define whileCondBoolErr 4
+#define forCondBoolErr 5
+#define caseMismatch 6
+#define returnMismatch 7
+
+
 int getType( int i);
 int getKind( int i);
-int checkType(int x , int y , int errorType);
+
 int checkKind (int kind);
 void setUsed(int i);
-int Operations (char operation,int par1, int par2,int setPar, int setMulLvl);
-void opr(int oper, int nops, ...);
-int ex(struct nodeTypeTag *p) ; 
-void addValue(void* value , int type);
-void addToOperation (char operation, char* par1, char* par2);
 
-struct nodeTypeTag symbol_table[10000];
-struct valueNodes values[10000];
+/*my functions*/
+valueNode* setValueNode(int type, void* value);
+void addToSymbolTable(char* name , int type, int kind, valueNode* value);
+int inTable(char* name);
+int checkType(int x , valueNode* y , int errorType);
+valueNode* Operations (char operation,valueNode* par1, valueNode* par2);
+valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2);
+void addOperation(valueNode* p, valueNode* val1, valueNode* val2);
+void subtractOperation(valueNode* p, valueNode* val1, valueNode* val2);
+void multiplyOperation(valueNode* p, valueNode* val1, valueNode* val2);
+void divideOperation(valueNode* p, valueNode* val1, valueNode* val2);
+void modOperation(valueNode* p, valueNode* val1, valueNode* val2);
+valueNode* getIDValue(char* name);
+void printSymbolTable();
+void removeCurrentScope();
+void updateSymbolTable(char* name, valueNode* value);
+valueNode* getIDValue(char* name);
+//----------------------------------------------
+struct STNode symbol_table[10000];
+
 int scope = 0;
-int scope_inc = 1;
 int idx = 0 ;
-int valueIdxInsert = 0;
-int valueIdx = 0; 
-int par = 2;
-int addSubLvl = 0;
-int mulDivLvl = 0;
+int update = 0;
 %}
 
 /* Define yylval union */
@@ -53,6 +68,7 @@ int mulDivLvl = 0;
     char* string_value;
     int boolean_value;
     char* identifier;
+	struct valueNodes* valueNode;
 }
 
 /* Define token types */
@@ -88,8 +104,8 @@ int mulDivLvl = 0;
 %precedence '(' ')' '{' '}'
 
 /*rules types*/ 
-%type <integer_value> data_type
-%type <integer_value> value
+%type <integer_value> data_type 
+%type <valueNode> value expression math_expression logical_expression term factor function_call
 
 /* Define grammar rules */
 %start program
@@ -115,11 +131,12 @@ block_statement : declaration ';'
 		| function
 		| return_statement ';'
         | print_statement ';'
+		| assignment ';'
         | CONTINUE ';'
 		| BREAK ';'
         ;
 
-block : '{' block_statements '}'
+block : '{' {scope++;} block_statements '}' {removeCurrentScope(); scope--;}  
 	  | '{' '}'
 	;
 
@@ -134,32 +151,25 @@ declaration: variable_declaration
 variable_declaration: data_type IDENTIFIER  
 	{
 		if(inTable((char*)$2) != -1)
-			yyerror("this variable has been declared before");
+			// error that the variable has been declared before
+			printf("error: Variable %s has been declared before\n", (char*)$2);
 		else
-			addToSymbolTable((char*)($2),$1,identifierKind);
+			addToSymbolTable((char*)($2),$1,identifierKind, NULL);
 	}
 	| data_type IDENTIFIER '=' expression
 	{
-		valueIdx = valueIdxInsert - 1;
 		if(inTable((char*)$2) != -1)
-			yyerror("this variable has been declared before");
-		//checkType($1,$4,1); 
-		addToSymbolTable((char*)($2),$1,identifierKind);
-		//addToOperation('=', (char*)($2), "$");
-		//mulDivLvl = 0;
-		//par = 2;
+			printf("error: Variable %s has been declared before\n", (char*)$2);
+		else if ($4 != NULL && checkType($1,$4,valueMismatch) != -1); 
+			addToSymbolTable((char*)($2),$1,identifierKind, $4);
 	}
 	| CONSTANT data_type IDENTIFIER '=' expression      
 	{
-		valueIdx = valueIdxInsert - 1;
 		if(inTable((char*)$3) != -1)
-			yyerror("this variable has been declared before");
-		//checkType($2,$5,1); 
-		addToSymbolTable((char*)($3),$2,identifierKind);
-		//addToOperation('=', (char*)($2), "$");
-		//mulDivLvl = 0;
-		//par = 2;
-	}  
+			printf("error: Constant %s has been declared before\n", (char*)$3);
+		else if ($5 != NULL && checkType($2,$5,valueMismatch) != -1); 
+			addToSymbolTable((char*)($3),$2,constantKind, $5);
+	}
 	;
 
 enum_declaration: ENUM IDENTIFIER '{' enum_list '}'
@@ -173,48 +183,47 @@ enum_item: IDENTIFIER '=' INTEGER_TYPE
     | IDENTIFIER
     ;
 
-assignment : IDENTIFIER '=' expression
+assignment : IDENTIFIER '=' expression  {updateSymbolTable($1,$3);}
     ; 
 
-expression: math_expression
-	| logical_expression 
-	| '(' expression ')'
-	| function_call
-	| assignment
+expression: math_expression  { $$ = $1;}
+	| logical_expression  { $$ = $1;}
+	| '(' expression ')' { $$ = $2;}
+	| function_call      { $$ = $1;}
 	;
 
 // we need to handle negative numbers in math_expression
-math_expression:  expression '+' term
-	| expression '-' term
-	| term
+math_expression:  expression '+' term {$$ = Operations('+', $1, $3); }
+	| expression '-' term  		      {$$ = Operations('-', $1, $3); }
+	| term                            {$$ = $1;}
 	;
 
-term: term '*' factor
-    | term '/' factor
-    | term '%' factor
-    | factor
+term: term '*' factor       {$$ = Operations('*', $1, $3); }
+    | term '/' factor       {$$ = Operations('/', $1, $3); }
+    | term '%' factor       {$$ = Operations('%', $1, $3); }
+    | factor                {$$ = $1;}
     ;
 
-factor: value 
-    | IDENTIFIER
+factor: value               {$$ = $1;}
+    | IDENTIFIER            {$$ = getIDValue($1);}
     ;
 
-logical_expression:  '!' expression 
-	| expression '<' expression 
-	| expression '>' expression
-	| expression GREATER_THAN_OR_EQUAL expression 
-	| expression LESS_THAN_OR_EQUAL expression 
-	| expression AND expression
-	| expression OR expression
-	| expression EQUAL expression
-	| expression NOT_EQUAL expression
+logical_expression:  '!' expression   { $$ = logicalOperations("!", $2, NULL); }
+	| expression '<' expression       { $$ = logicalOperations("<", $1, $3); }
+	| expression '>' expression       { $$ = logicalOperations(">", $1, $3); }
+	| expression GREATER_THAN_OR_EQUAL expression     { $$ = logicalOperations(">=" , $1, $3); }
+	| expression LESS_THAN_OR_EQUAL expression        { $$ = logicalOperations("<=", $1, $3); }
+	| expression AND expression                       { $$ = logicalOperations("&&", $1, $3); }
+	| expression OR expression                        { $$ = logicalOperations("||", $1, $3); }
+	| expression EQUAL expression                     { $$ = logicalOperations("==", $1, $3); }
+	| expression NOT_EQUAL expression                 { $$ = logicalOperations("!=", $1, $3); }
     ;
 
-value: INTEGER_TYPE  { addValue(&($1),typeInteger);$$ = typeInteger; }
-	| FLOAT_TYPE     { addValue(&($1),typeFloat);$$ = typeFloat; }
-	| BOOLEAN_TYPE   { addValue(&($1),typeBoolean);$$ = typeBoolean; }
-	| CHARACTER_TYPE { addValue(&($1),typeCharchter);$$ = typeCharchter; }
-	| STRING_TYPE    { addValue(&($1),typeString);$$ = typeString; }
+value: INTEGER_TYPE  { $$ = setValueNode(typeInteger, &$1); }
+	| FLOAT_TYPE     { $$ = setValueNode(typeFloat, &$1); }
+	| BOOLEAN_TYPE   { $$ = setValueNode(typeFloat, &$1); }
+	| CHARACTER_TYPE { $$ = setValueNode(typeCharchter, &$1); }
+	| STRING_TYPE    { $$ = setValueNode(typeString, &$1); }
 	;
 
 data_type: INT { $$ = typeInteger; }
@@ -245,8 +254,8 @@ for_statement: for_declaration  block
 	| for_declaration block_statement
 	;
 
-for_declaration: FOR '(' variable_declaration  ';' logical_expression  ';' expression ')'
-				| FOR '(' assignment  ';' logical_expression  ';' expression ')'
+for_declaration: FOR '(' variable_declaration  ';' logical_expression  ';' assignment ')'
+				| FOR '(' assignment  ';' logical_expression  ';' assignment ')'
 	;
 
 do_while_statement : DO  block while_declaraction
@@ -275,11 +284,11 @@ function : VOID IDENTIFIER '(' arguments')'  block
 	|  data_type IDENTIFIER  '(' arguments')'  block 
 	;
 
-function_call: IDENTIFIER '('argument_call')' 
+function_call: IDENTIFIER '('argument_call')'  
 	;
 
-argument_call: argument_call ',' expression
-			| expression
+argument_call: argument_call ',' expression  
+			| expression  
 			| %empty
 			;
 
@@ -295,62 +304,68 @@ else_statement : ELSE block
 
 %%
 
+//-------------------------------------------------------------------------------------------------
 void yyerror(char *s) {
     fprintf(stdout, "%s\n", s);
 }
 
-void addToSymbolTable(char* name , int type, int kind) { 
-	struct nodeTypeTag p; 
-	p.isUsed = 0;
+
+//--------------------------------------------------
+/* My functions*/
+valueNode* setValueNode(int type, void* value){
+	valueNode* p = (valueNode*)malloc(sizeof(valueNode));
+	p->type = type;
+	//p->kind = constantKind;
+	if (type == typeInteger)
+		p->integer = *((int *)value);
+	else if (type == typeFloat)
+		p->floatNumber = *((float *)value);
+	else if (type == typeBoolean)
+		p->boolean = *((int *)value);
+	else if (type == typeCharchter)
+		p->character = *((char *)value);
+	else
+		p->name = (char*)value;
+	return p;
+}
+
+
+void addToSymbolTable(char* name , int type, int kind, valueNode* value) { 
+	struct STNode p; 
+	p.isUsed = 1;
 	p.type = type;
 	p.kind = kind;
 	p.name = name;
 	p.scope = scope;
+	p.value = value;
 	symbol_table[idx++] = p;
 } 
 int inTable(char* name){
 	for (int i =0;i < idx;i++)
-		if (symbol_table[i].kind!=4 && !strcmp(name,symbol_table[i].name) && symbol_table[i].scope == scope)
+		if (!strcmp(name,symbol_table[i].name) && (symbol_table[i].scope == scope || symbol_table[i].scope < scope) && symbol_table[i].isUsed == 1)
 			return i;  
 	return -1;
 } 
-int getType(int i){
-	if (i == -1)
-		return -1;       
-	return symbol_table[i].type;
-}
-int getKind(int i){
-	return symbol_table[i].kind;
-}
-void setUsed(int i){
-	symbol_table[i].isUsed = 1;
-}
-int checkType(int x , int y , int errorType){
-	if (x == -1)
-		return y;
-	else if (y == -1)
-		return x;
-	else if (x != y){
+
+int checkType(int x , valueNode* y , int errorType){
+	if (y != NULL && x != y->type){
 		switch (errorType){
-			case 1:
-				yyerror("variable type missmatches with the assigned value "); 
+			case valueMismatch:
+				yyerror("variable/constant mismatches with the assigned value "); 
 				break; 
-			case 2:
-				yyerror("constant type missmatches with the assigned value ");  
-				break;
-			case 3:
+			case ifCondBoolErr:
 				yyerror("if condition  must be of type boolean ");  
 				break;
-			case 4:
+			case whileCondBoolErr:
 				yyerror("while condition must be of type boolean ");  
 				break;
-			case 5:
+			case forCondBoolErr:
 				yyerror("for condition must be of type boolean ");  
 				break;
-			case 6:
+			case caseMismatch:
 				yyerror("case variable type must be same as switch variable type ");  
 				break;
-			case 7:
+			case returnMismatch:
 				yyerror("return type must be the same as function type ");  
 				break;
 		}
@@ -358,27 +373,269 @@ int checkType(int x , int y , int errorType){
 	}
 	return x;
 }
-int checkKind (int kind){
-	if (kind == 2)
-		yyerror("constant cannot be modified");  
-	if (kind == 3)
-		yyerror("function cannot be modified");  
-	return kind;
+
+void addOperation(valueNode* p, valueNode* val1, valueNode* val2) {
+	switch(p->type) {
+		case typeInteger: {
+			p->integer = val1->integer + val2->integer;
+			break;
+		}
+		case typeFloat: {
+			p->floatNumber = val1->floatNumber + val2->floatNumber;
+			break;
+		}
+		case typeBoolean: {
+			p->boolean = val1->boolean + val2->boolean;
+			break;
+		}
+		case typeCharchter: {
+			p->character = val1->character + val2->character;
+			break;
+		}
+		case typeString: {
+			p->name = (char*)malloc(strlen(val1->name) + strlen(val2->name) + 1);
+			strcpy(p->name, val1->name);
+			strcat(p->name, val2->name);
+			break;
+		}
+	}
 }
 
-void addValue(void* value , int type){
-	struct valueNodes p;
-	p.type = type;
-	p.used = 0;
-	if (type == typeInteger)
-		p.integer = *((int *)value);
-	else if (type == typeFloat)
-		p.floatNumber = *((float *)value);
-	else if (type == typeBoolean)
-		p.boolean = *((int *)value);
-	else if (type == typeCharchter)
-		p.character = *((char *)value);
-	else
-		p.name = (char*)value;
-	values[valueIdxInsert++] = p;
+void subOperation(valueNode* p, valueNode* val1, valueNode* val2) {
+	switch(p->type) {
+		case typeInteger: {
+			p->integer = val1->integer - val2->integer;
+			break;
+		}
+		case typeFloat: {
+			p->floatNumber = val1->floatNumber - val2->floatNumber;
+			break;
+		}
+		case typeBoolean: {
+			p->boolean = val1->boolean - val2->boolean;
+			break;
+		}
+		case typeCharchter: {
+			p->character = val1->character - val2->character;
+			break;
+		}
+		case typeString: {
+			// error string does not support subtraction
+			printf("string does not support subtraction");
+			break;
+		}
+	}
+}
+
+void multiplyOperation(valueNode* p, valueNode* val1, valueNode* val2) {
+	switch(p->type) {
+		case typeInteger: {
+			p->integer = val1->integer * val2->integer;
+			break;
+		}
+		case typeFloat: {
+			p->floatNumber = val1->floatNumber * val2->floatNumber;
+			break;
+		}
+		case typeBoolean: {
+			p->boolean = val1->boolean * val2->boolean;
+			break;
+		}
+		case typeCharchter: {
+			p->character = val1->character * val2->character;
+			break;
+		}
+		case typeString: {
+			// error string does not support subtraction
+			printf("string does not support multiplication");
+			break;
+		}
+	}
+}
+
+void modeOperation(valueNode* p, valueNode* val1, valueNode* val2) {
+	switch(p->type) {
+		case typeInteger: {
+			p->integer = (val2->integer != 0)? val1->integer % val2->integer : 0;
+			if (val2->integer == 0)
+				yyerror("division by zero"); 
+			break;
+		}
+		case typeFloat: {
+			printf("Float values do not support mode operation");
+			p->floatNumber = 0.0;
+			if (val2->floatNumber == 0.0)
+				yyerror("division by zero"); 
+			break;
+		}
+		case typeBoolean: {
+			printf("Boolean values do not support mode operation");
+			break;
+		}
+		case typeCharchter: {
+			p->character = val1->character % val2->character;
+			break;
+		}
+		case typeString: {
+			// error string does not support subtraction
+			printf("String values do not support mode operation");
+			break;
+		}
+	}
+}
+
+void divideOperation(valueNode* p, valueNode* val1, valueNode* val2) {
+	switch(p->type) {
+		case typeInteger: {
+			p->integer = (val2->integer != 0)? val1->integer / val2->integer : 0;
+			if (val2->integer == 0)
+				yyerror("division by zero"); 
+			break;
+		}
+		case typeFloat: {
+			p->floatNumber = (val2->floatNumber != 0.0)? val1->floatNumber / val2->floatNumber : 0.0;
+			if (val2->floatNumber == 0.0)
+				yyerror("division by zero"); 
+			break;
+		}
+		case typeBoolean: {
+			printf("boolean does not support divide operation");
+			break;
+		}
+		case typeCharchter: {
+			p->character = val1->character / val2->character;
+			break;
+		}
+		case typeString: {
+			// error string does not support subtraction
+			printf("string does not support divide operation");
+			break;
+		}
+	}
+}
+
+valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
+	int type1 = par1->type;
+	int type2 = par2->type;
+	// check if the two types are the same
+	if (checkType(type1, par2, valueMismatch) == type1){
+		valueNode* p = (valueNode*)malloc(sizeof(valueNode));
+		p->type = type1;
+		switch(operation) {
+			case '+': {
+				addOperation(p, par1, par2);
+				break;
+			}
+			case '-': {
+				subOperation(p, par1, par2);
+				break;
+			}
+			case '*': {
+				multiplyOperation(p, par1, par2);
+				break;
+			}
+			case '%': {
+				modeOperation(p, par1, par2);
+				break;
+			}
+			case '/': {
+				divideOperation(p, par1, par2);
+				break;
+			}
+		}
+		return p;
+	}
+	return NULL;
+	
+}
+
+valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) {
+	int type1 = par1->type;
+	int type2 = par2->type;
+	// check if the two types are the same
+	if (checkType(type1, par2, valueMismatch) == type1){
+		valueNode* p = (valueNode*)malloc(sizeof(valueNode));
+		p->type = type1;
+		if(strcmp(operation, "&&") == 0) {
+			p->boolean = par1->boolean && par2->boolean;
+		}
+		else if(strcmp(operation, "||") == 0) {
+			p->boolean = par1->boolean || par2->boolean;
+		}
+		else if(strcmp(operation, "!") == 0) {
+			p->boolean = !par1->boolean;
+		}
+		else if(strcmp(operation, "==") == 0) {
+			p->boolean = par1->boolean == par2->boolean;
+		}
+		else if(strcmp(operation, "!=") == 0) {
+			p->boolean = par1->boolean != par2->boolean;
+		}
+		else if(strcmp(operation, "<") == 0) {
+			p->boolean = par1->boolean < par2->boolean;
+		}
+		else if(strcmp(operation, ">") == 0) {
+			p->boolean = par1->boolean > par2->boolean;
+		}
+		else if(strcmp(operation, "<=") == 0) {
+			p->boolean = par1->boolean <= par2->boolean;
+		}
+		else if(strcmp(operation, ">=") == 0) {
+			p->boolean = par1->boolean >= par2->boolean;
+		}
+		return p;
+	}
+	return NULL;
+}
+
+valueNode* getIDValue(char* name) {
+	// check that the variable is in the symbol table
+	int index = inTable(name);
+	if (index == -1) {
+		printf("variable %s not declared in this scope", name);
+		return NULL;
+	}
+	// check that the variable is initialized
+	if (symbol_table[index].isUsed == 0) {
+		yyerror("variable not initialized");
+		return NULL;
+	}
+	// return the value of the variable
+	return symbol_table[index].value;
+}
+
+void updateSymbolTable(char* name, valueNode* value) {
+	// check that the variable is in the symbol table
+	int index = inTable(name);
+	if (index == -1) {
+		printf("variable %s not declared\n", name);
+		return;
+	}
+
+	// update the value of the variable
+	symbol_table[index].value = value;
+	
+
+}
+
+// this function removes all variables with current scope from the symbol table using deallocation 
+void removeCurrentScope() {
+	int i;
+	for (i = 0; i < idx; i++) {
+		if (symbol_table[i].scope == scope) {
+			symbol_table[i].isUsed = 0;
+			symbol_table[i].value = NULL;
+		}
+	}
+}
+
+void printSymbolTable() {
+	update++;
+	printf("Symbol Table version %d:\n", update);
+	printf("====================================================\n");
+	int i;
+	for (i = 0; i < idx; i++) {
+		printf("name: %s, scope: %d, type: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].isUsed);
+	}
+	printf("====================================================\n");
 }
