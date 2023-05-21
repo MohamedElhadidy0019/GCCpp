@@ -29,6 +29,7 @@ int yyparse();
 #define forCondBoolErr 5
 #define caseMismatch 6
 #define returnMismatch 7
+#define funArgMismatch 8
 
 
 int getType( int i);
@@ -57,12 +58,17 @@ void printSymbolTableCSV();
 void removeCurrentScope();
 void updateSymbolTable(char* name, valueNode* value);
 valueNode* getIDValue(char* name);
+int checkArgs(Args* args1, Args* args2);
+int functionInTable(char* name, Args* args);
+void addFunctionToSymbolTable(char* name, int type, int kind, Args* args);
+int getActiveFunctionType();
 //----------------------------------------------
 struct STNode symbol_table[10000];
 
 int scope = 0;
 int idx = 0 ;
 int update = 0;
+int activeFunctionType = -1;
 %}
 
 /* Define yylval union */
@@ -74,6 +80,7 @@ int update = 0;
     int boolean_value;
     char* identifier;
 	struct valueNodes* valueNode;
+	struct Args* fnArgs;
 }
 
 /* Define token types */
@@ -109,8 +116,9 @@ int update = 0;
 %precedence '(' ')' '{' '}'
 
 /*rules types*/ 
-%type <integer_value> data_type 
+%type <integer_value> data_type argument
 %type <valueNode> value expression math_expression logical_expression term factor function_call
+%type <fnArgs> arguments
 
 /* Define grammar rules */
 %start program
@@ -141,12 +149,24 @@ block_statement : declaration ';'
 		| BREAK ';'
         ;
 
-block : '{' {scope++;} block_statements '}' {removeCurrentScope(); scope--;}  
+block : '{' {scope++;} block_statements '}' {activeFunctionType = -1; removeCurrentScope(); scope--;}  
 	  | '{' '}'
 	;
 
-return_statement : RETURN expression
+return_statement : RETURN expression 
+	{
+		if(activeFunctionType == -1)
+			printf("error: return statement not in a function\n");
+		else
+			checkType(activeFunctionType, $2, returnMismatch);
+	}	
 	| RETURN 
+	{
+		if(activeFunctionType == -1)
+			printf("error: return statement not in a function\n");
+		else if(activeFunctionType != typeVoid)
+			printf("error: return type mismatch\n");
+	}
 	;
 
 declaration: variable_declaration 
@@ -277,16 +297,48 @@ case_statement : CASE value ':' block case_statement
 
 
 arguments: arguments ',' argument 
-	| argument 
-	| %empty
-	;
-
-argument : data_type IDENTIFIER
-	| data_type IDENTIFIER '=' expression
+	{
+		Args* args = (Args*)$1;
+		args->types[args->nargs] = $3;
+		args->nargs++;
+		$$ = args;
+	}
+	| argument  
+	{
+	 	Args* args = (Args*)malloc(sizeof(Args));
+		args->types[0] = $1;
+		args->nargs = 1;
+		$$ = args;
+	}
+	| %empty {Args* args = (Args*)malloc(sizeof(Args)); args->nargs = 0; $$ = args;}
 	;
 	
-function : VOID IDENTIFIER '(' arguments')'  block 
-	|  data_type IDENTIFIER  '(' arguments')'  block 
+
+argument : data_type IDENTIFIER 
+	{
+		if(inTable((char*)$2) != -1)
+			printf("error: Variable %s has been declared before\n", (char*)$2);
+		else {
+			addToSymbolTable((char*)$2,$1,functionKind, NULL);
+			$$ = $1;
+		}
+	}
+	| data_type IDENTIFIER '=' expression 
+	{	
+		int check = checkType($1,$4,funArgMismatch);
+		if(check != -1) {
+			if(inTable((char*)$2) != -1)
+				printf("error: Variable %s has been declared before\n", (char*)$2);
+			else if ($4 != NULL && checkType($1,$4,valueMismatch) != -1) {
+				addToSymbolTable((char*)$2,$1,functionKind, $4);
+				$$ = $1;
+			}
+		}
+	}
+	;
+	
+function : VOID IDENTIFIER  '(' {activeFunctionType = typeVoid;} arguments')'  block  {addFunctionToSymbolTable($2,typeVoid,functionKind, $5);}
+	|  data_type IDENTIFIER  '(' {activeFunctionType = $1;} arguments')'  block  {addFunctionToSymbolTable($2,$1,functionKind, $5);}
 	;
 
 function_call: IDENTIFIER '('argument_call')'  
@@ -335,19 +387,85 @@ valueNode* setValueNode(int type, void* value){
 }
 
 
+// this function checks that all the args are of the same type as another args types
+// 0 means that the 2 args are not the same
+// 1 means that the 2 args are the same
+int checkArgs(Args* args1, Args* args2){
+	if (args1->nargs != args2->nargs) {
+		for(int i=0; i<args1->nargs; i++){
+			if (args1->types[i] != args2->types[i])
+				return 0;
+		}
+		return 1;
+	}
+	else
+		return 0;
+
+}
+
+int functionInTable(char* name, Args* args){
+	for (int i =0;i < idx;i++)
+		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0 && symbol_table[i].kind == functionKind && checkArgs(args, symbol_table[i].args) == 1) {
+			return i;  
+		}
+		else if(!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0 && (symbol_table[i].kind == identifierKind || symbol_table[i].kind == constantKind)) {
+			return i;
+		}
+	return -1;
+}
+
+void addFunctionToSymbolTable(char* name, int type, int kind, Args* args){
+	if(scope != 0){
+		printf("Error: function %s  must be global\n", name);
+	}
+	else {
+		if (functionInTable(name, args) != -1){
+			printf("Error: function %s is already defined\n", name);
+		}
+		else{
+			struct STNode p;
+			p.isUsed = 1;
+			p.type = type;
+			p.kind = kind;
+			p.name = name;
+			p.scope = scope;
+			p.args = args;
+			symbol_table[idx++] = p;
+			// print the symbol table as CSV
+			printSymbolTableCSV();
+		}
+	}
+
+}
+
 void addToSymbolTable(char* name , int type, int kind, valueNode* value) { 
 	struct STNode p; 
 	p.isUsed = 1;
 	p.type = type;
-	p.kind = kind;
 	p.name = name;
-	p.scope = scope;
-	p.value = value;
+	if(kind == functionKind) {
+		p.scope = 1;
+		p.kind = identifierKind;
+	}
+	else {
+		p.scope = scope;
+		p.kind = kind;
+	}
+	if(value == NULL) {
+		valueNode* v = (valueNode*)malloc(sizeof(valueNode));
+		v->type = type;
+		v->kind = kind;
+		p.value = v;
+	}
+	else
+		p.value = value;
 	symbol_table[idx++] = p;
 
 	// print the symbol table as CSV
 	printSymbolTableCSV();
 } 
+
+
 int inTable(char* name){
 	for (int i =0;i < idx;i++)
 		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == scope  && symbol_table[i].isUsed == 1)
@@ -383,6 +501,9 @@ int checkType(int x , valueNode* y , int errorType){
 			case returnMismatch:
 				yyerror("return type must be the same as function type ");  
 				break;
+			case funArgMismatch:
+				yyerror("function argument value must be the same as function argument type "); 
+				break;
 		}
 		return -1;
 	}
@@ -391,26 +512,14 @@ int checkType(int x , valueNode* y , int errorType){
 
 void addOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 	switch(p->type) {
-		case typeInteger: {
-			p->integer = val1->integer + val2->integer;
+		case typeInteger: 
+		case typeFloat:
+		case typeBoolean:
+		case typeCharchter:
 			break;
-		}
-		case typeFloat: {
-			p->floatNumber = val1->floatNumber + val2->floatNumber;
-			break;
-		}
-		case typeBoolean: {
-			p->boolean = val1->boolean + val2->boolean;
-			break;
-		}
-		case typeCharchter: {
-			p->character = val1->character + val2->character;
-			break;
-		}
 		case typeString: {
-			p->name = (char*)malloc(strlen(val1->name) + strlen(val2->name) + 1);
-			strcpy(p->name, val1->name);
-			strcat(p->name, val2->name);
+			// error string does not support addition
+			printf("string does not support addition");
 			break;
 		}
 	}
@@ -418,22 +527,11 @@ void addOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 
 void subOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 	switch(p->type) {
-		case typeInteger: {
-			p->integer = val1->integer - val2->integer;
+		case typeInteger: 
+		case typeFloat: 
+		case typeBoolean: 
+		case typeCharchter:
 			break;
-		}
-		case typeFloat: {
-			p->floatNumber = val1->floatNumber - val2->floatNumber;
-			break;
-		}
-		case typeBoolean: {
-			p->boolean = val1->boolean - val2->boolean;
-			break;
-		}
-		case typeCharchter: {
-			p->character = val1->character - val2->character;
-			break;
-		}
 		case typeString: {
 			// error string does not support subtraction
 			printf("string does not support subtraction");
@@ -444,22 +542,11 @@ void subOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 
 void multiplyOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 	switch(p->type) {
-		case typeInteger: {
-			p->integer = val1->integer * val2->integer;
+		case typeInteger:
+		case typeFloat:
+		case typeBoolean:
+		case typeCharchter:
 			break;
-		}
-		case typeFloat: {
-			p->floatNumber = val1->floatNumber * val2->floatNumber;
-			break;
-		}
-		case typeBoolean: {
-			p->boolean = val1->boolean * val2->boolean;
-			break;
-		}
-		case typeCharchter: {
-			p->character = val1->character * val2->character;
-			break;
-		}
 		case typeString: {
 			// error string does not support subtraction
 			printf("string does not support multiplication");
@@ -471,14 +558,12 @@ void multiplyOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 void modeOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 	switch(p->type) {
 		case typeInteger: {
-			p->integer = (val2->integer != 0)? val1->integer % val2->integer : 0;
 			if (val2->integer == 0)
 				yyerror("division by zero"); 
 			break;
 		}
 		case typeFloat: {
 			printf("Float values do not support mode operation");
-			p->floatNumber = 0.0;
 			if (val2->floatNumber == 0.0)
 				yyerror("division by zero"); 
 			break;
@@ -487,10 +572,8 @@ void modeOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 			printf("Boolean values do not support mode operation");
 			break;
 		}
-		case typeCharchter: {
-			p->character = val1->character % val2->character;
-			break;
-		}
+		case typeCharchter: 
+		  	break;
 		case typeString: {
 			// error string does not support subtraction
 			printf("String values do not support mode operation");
@@ -502,13 +585,11 @@ void modeOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 void divideOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 	switch(p->type) {
 		case typeInteger: {
-			p->integer = (val2->integer != 0)? val1->integer / val2->integer : 0;
 			if (val2->integer == 0)
 				yyerror("division by zero"); 
 			break;
 		}
 		case typeFloat: {
-			p->floatNumber = (val2->floatNumber != 0.0)? val1->floatNumber / val2->floatNumber : 0.0;
 			if (val2->floatNumber == 0.0)
 				yyerror("division by zero"); 
 			break;
@@ -518,7 +599,7 @@ void divideOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 			break;
 		}
 		case typeCharchter: {
-			p->character = val1->character / val2->character;
+			printf("character does not support divide operation");
 			break;
 		}
 		case typeString: {
@@ -529,6 +610,8 @@ void divideOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 	}
 }
 
+
+// TODO: Don't forget to generate Quadruples for each operation
 valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
 	int type1 = par1->type;
 	int type2 = par2->type;
@@ -568,121 +651,36 @@ valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
 	
 }
 
+// TODO: Don't forget to generate Quadruples for each operation
 void comparisonOperations(char* operation, valueNode* par1, valueNode* par2, valueNode* result) {
 
 	int type1 = par1->type;
 	switch(type1) {
-		case typeInteger: {
-			int val1 = par1->integer;
-			int val2 = par2->integer;
-			if(strcmp(operation, "==") == 0) {
-				result->boolean = (val1 == val2);
-			}
-			else if(strcmp(operation, "!=") == 0) {
-				result->boolean = (val1 != val2);
-			}
-			else if(strcmp(operation, ">") == 0) {
-				result->boolean = (val1 > val2);
-			}
-			else if(strcmp(operation, "<") == 0) {
-				result->boolean = (val1 < val2);
-			}
-			else if(strcmp(operation, ">=") == 0) {
-				result->boolean = (val1 >= val2);
-			}
-			else if(strcmp(operation, "<=") == 0) {
-				result->boolean = (val1 <= val2);
-			}
-		}
-		case typeFloat: {
-			float val1 = par1->floatNumber;
-			float val2 = par2->floatNumber;
-			if(strcmp(operation, "==") == 0) {
-				result->boolean = (val1 == val2);
-			}
-			else if(strcmp(operation, "!=") == 0) {
-				result->boolean = (val1 != val2);
-			}
-			else if(strcmp(operation, ">") == 0) {
-				result->boolean = (val1 > val2);
-			}
-			else if(strcmp(operation, "<") == 0) {
-				result->boolean = (val1 < val2);
-			}
-			else if(strcmp(operation, ">=") == 0) {
-				result->boolean = (val1 >= val2);
-			}
-			else if(strcmp(operation, "<=") == 0) {
-				result->boolean = (val1 <= val2);
-			}
-		}
-		case typeBoolean: {
-			int val1 = par1->boolean;
-			int val2 = par2->boolean;
-			if(strcmp(operation, "==") == 0) {
-				result->boolean = (val1 == val2);
-			}
-			else if(strcmp(operation, "!=") == 0) {
-				result->boolean = (val1 != val2);
-			}
-			else if(strcmp(operation, ">") == 0) {
-				result->boolean = (val1 > val2);
-			}
-			else if(strcmp(operation, "<") == 0) {
-				result->boolean = (val1 < val2);
-			}
-			else if(strcmp(operation, ">=") == 0) {
-				result->boolean = (val1 >= val2);
-			}
-			else if(strcmp(operation, "<=") == 0) {
-				result->boolean = (val1 <= val2);
-			}
-		}
-		case typeCharchter: {
-			char val1 = par1->character;
-			char val2 = par2->character;
-			if(strcmp(operation, "==") == 0) {
-				result->boolean = (val1 == val2);
-			}
-			else if(strcmp(operation, "!=") == 0) {
-				result->boolean = (val1 != val2);
-			}
-			else if(strcmp(operation, ">") == 0) {
-				result->boolean = (val1 > val2);
-			}
-			else if(strcmp(operation, "<") == 0) {
-				result->boolean = (val1 < val2);
-			}
-			else if(strcmp(operation, ">=") == 0) {
-				result->boolean = (val1 >= val2);
-			}
-			else if(strcmp(operation, "<=") == 0) {
-				result->boolean = (val1 <= val2);
-			}
-		}
+		case typeInteger: 
+		case typeFloat: 
+		case typeBoolean: 
+		case typeCharchter:
+			// generate Quadruples
+			break;
 		case typeString: {
-			char* val1 = par1->name;
-			char* val2 = par2->name;
 			if(strcmp(operation, "==") == 0) {
-				result->boolean = (strcmp(val1, val2) == 0);
+				//result->boolean = (strcmp(val1, val2) == 0);
+				printf("Error: cannot compare strings with ==\n");
 			}
 			else if(strcmp(operation, "!=") == 0) {
-				result->boolean = (strcmp(val1, val2) != 0);
+				//result->boolean = (strcmp(val1, val2) != 0);
+				printf("Error: cannot compare strings with !=\n");
 			}
 			else if(strcmp(operation, ">") == 0) {
-				result->boolean = 0;
 				printf("Error: cannot compare strings with >\n");
 			}
 			else if(strcmp(operation, "<") == 0) {
-				result->boolean = 0;
 				printf("Error: cannot compare strings with <\n");
 			}
 			else if(strcmp(operation, ">=") == 0) {
-				result->boolean = 0;
 				printf("Error: cannot compare strings with >=\n");
 			}
 			else if(strcmp(operation, "<=") == 0) {
-				result->boolean = 0;
 				printf("Error: cannot compare strings with <=\n");
 			}
 		}
@@ -699,31 +697,16 @@ valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) 
 		valueNode* p = (valueNode*)malloc(sizeof(valueNode));
 		p->type = typeBoolean;
 		if(strcmp(operation, "&&") == 0) {
-			p->boolean = par1->boolean && par2->boolean;
+			//p->boolean = par1->boolean && par2->boolean;
 		}
 		else if(strcmp(operation, "||") == 0) {
-			p->boolean = par1->boolean || par2->boolean;
+			//p->boolean = par1->boolean || par2->boolean;
 		}
 		else if(strcmp(operation, "!") == 0) {
-			p->boolean = !par1->boolean;
+			//p->boolean = !par1->boolean;
 		}
-		else if(strcmp(operation, "==") == 0) {
-			p->boolean = par1->boolean == par2->boolean;
-		}
-		else if(strcmp(operation, "!=") == 0) {
-			p->boolean = par1->boolean != par2->boolean;
-		}
-		else if(strcmp(operation, "<") == 0) {
-			p->boolean = par1->boolean < par2->boolean;
-		}
-		else if(strcmp(operation, ">") == 0) {
-			p->boolean = par1->boolean > par2->boolean;
-		}
-		else if(strcmp(operation, "<=") == 0) {
-			p->boolean = par1->boolean <= par2->boolean;
-		}
-		else if(strcmp(operation, ">=") == 0) {
-			p->boolean = par1->boolean >= par2->boolean;
+		else {
+			comparisonOperations(operation, par1, par2, p);
 		}
 		return p;
 	}
@@ -734,7 +717,7 @@ valueNode* getIDValue(char* name) {
 	// check that the variable is in the symbol table
 	int index = inTable(name);
 	if (index == -1) {
-		printf("variable %s not declared in this scope", name);
+		printf("variable %s not declared in this scope\n", name);
 		return NULL;
 	}
 	// check that the variable is initialized
@@ -744,6 +727,15 @@ valueNode* getIDValue(char* name) {
 	}
 	// return the value of the variable
 	return symbol_table[index].value;
+}
+
+int getActiveFunctionType() {
+	for (int i = 0; i < idx; i++) {
+		if (symbol_table[i].isUsed == 1 && symbol_table[i].kind == functionKind) {
+			return symbol_table[i].type;
+		}
+	}
+	return -1;
 }
 
 void updateSymbolTable(char* name, valueNode* value) {
@@ -777,50 +769,6 @@ void removeCurrentScope() {
 	}
 }
 
-void printSymbolTable() {
-	// Open the log file
-    logFile = fopen("symbol_table.log", "a");
-    if (logFile == NULL) {
-        fprintf(stderr, "Error opening log file.\n");
-        exit(1);
-    }
-	update++;
-	fprintf(logFile, "Symbol Table version %d:\n", update);
-	fprintf(logFile, "====================================================\n");
-	int i;
-	for (i = 0; i < idx; i++) {
-		switch(symbol_table[i].type) {
-			case typeInteger: {
-				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->integer, symbol_table[i].isUsed);
-				break;
-			}
-			case typeFloat: {
-				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %f, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->floatNumber, symbol_table[i].isUsed);
-				break;
-			}
-			case typeString: {
-				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %s, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->name, symbol_table[i].isUsed);
-				break;
-			}
-			case typeBoolean: {
-				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->boolean, symbol_table[i].isUsed);
-				break;
-			}
-			case typeCharchter: {
-				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %c, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->character, symbol_table[i].isUsed);
-				break;
-			}
-			default: {
-				fprintf(logFile, "name: %s, scope: %d, type: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].isUsed);
-				break;
-			}
-		}
-	}
-	fprintf(logFile, "====================================================\n");
-
-	// Close the log file
-	fclose(logFile);
-}
 
 // this function prints the symbol table in the log file as a comma separated values
 void printSymbolTableCSV() {
@@ -833,50 +781,11 @@ void printSymbolTableCSV() {
 	//update++;
 	//fprintf(logFile, "%d,", update);
 	// print the fields names
-	fprintf(logFile, "name, scope, type, value\n");
+	fprintf(logFile, "name, scope, type, kind\n");
 	int i;
 	for (i = 0; i < idx; i++) {
-		switch(symbol_table[i].type) {
-			case typeInteger: {
-				if(symbol_table[i].value != NULL)
-					fprintf(logFile, "%s,%d,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->integer);
-				else
-					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
-				break;
-			}
-			case typeFloat: {
-				if(symbol_table[i].value != NULL)
-					fprintf(logFile, "%s,%d,%d,%f\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->floatNumber);
-				else
-					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
-				break;
-			}
-			case typeString: {
-				if(symbol_table[i].value != NULL)
-					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->name);
-				else
-					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
-				break;
-			}
-			case typeBoolean: {
-				if(symbol_table[i].value != NULL)
-					fprintf(logFile, "%s,%d,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->boolean);
-				else
-					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
-				break;
-			}
-			case typeCharchter: {
-				if(symbol_table[i].value != NULL)
-					fprintf(logFile, "%s,%d,%d,%c\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->character);
-				else
-					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
-				break;
-			}
-			default: {
-				fprintf(logFile, "%s,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type);
-				break;
-			}
-		}
+		// print each entry in the symbol table as a comma separated values regardelss of the value
+		fprintf(logFile, "%s, %d, %d, %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
 	}
 	// print a separator line
 	fprintf(logFile, "==================================================\n");

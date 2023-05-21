@@ -1,12 +1,10 @@
 
-int x;
-x = 5;
+int calc (int x, int y) {
+    return x + y;
+}
 
-int y;
-y = 3 + 7;
+int calc;
 
-bool z = (3 <= 5);
+int x = 9;
 
-z = 0;
-
-bool e = (z || 1);
+const int y = 2;

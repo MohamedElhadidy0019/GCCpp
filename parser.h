@@ -21,6 +21,14 @@ typedef struct valueNodes
 } valueNode;
 
 
+typedef struct Args {
+    int types[10];
+    int nargs; 
+} Args;
+struct FnCall {
+    valueNode* args[10];
+    int nargs;
+};
 
 struct STNode
 {
@@ -30,4 +38,5 @@ struct STNode
     int scope;
     int isUsed;
     valueNode *value;
+    struct Args *args;
 };
