@@ -62,6 +62,7 @@ int checkArgs(Args* args1, Args* args2);
 int functionInTable(char* name, Args* args);
 void addFunctionToSymbolTable(char* name, int type, int kind, Args* args);
 int getActiveFunctionType();
+int getFunctionType(int index);
 //----------------------------------------------
 struct STNode symbol_table[10000];
 
@@ -120,7 +121,7 @@ int loop = 0;
 /*rules types*/ 
 %type <integer_value> data_type argument
 %type <valueNode> value expression math_expression logical_expression term factor function_call
-%type <fnArgs> arguments
+%type <fnArgs> arguments argument_call
 
 /* Define grammar rules */
 %start program
@@ -135,10 +136,8 @@ block_statements : block_statement
 
 block_statement : declaration ';'
         | expression ';'		
-		| do_while_statement ';' 
-		| if_condition block_statement    %prec IFX 
+		| do_while_statement ';'   
 		| if_condition block              %prec IFX
-		| if_condition block_statement else_statement
 		| if_condition block else_statement
 		| while_statement 
 		| for_statement 
@@ -152,6 +151,7 @@ block_statement : declaration ';'
         ;
 
 block : '{' {scope++;} block_statements '}' {removeCurrentScope(); scope--;}  
+	  | {scope++;} block_statement {removeCurrentScope(); scope--;}
 	  | '{' '}'
 	;
 
@@ -274,7 +274,7 @@ data_type: INT { $$ = typeInteger; }
 
 
 while_statement: while_declaraction  block 
-	| while_declaraction {scope++;} block_statement {removeCurrentScope(); scope--;}
+	;
 
 while_declaraction : WHILE 	{
 		if(activeFunctionType == -1)
@@ -292,25 +292,19 @@ argument_print: argument_print ',' expression
 			;
 
 
-for_statement: for_declaration  block 
+for_statement: for_declaration block 
 	{
 		if(activeFunctionType == -1)
 			printf("error: for statement not in a function\n");	
 	}
-	| for_declaration {scope++;} block_statement 
-	{
-		removeCurrentScope(); 
-		scope--;
-	}
 	;
 
-for_declaration: FOR '(' variable_declaration  ';' logical_expression  ';' assignment ')'
+for_declaration: FOR '(' {scope++; loop=1;} variable_declaration  ';' logical_expression  ';' assignment ')' {scope--; loop=0;}
 
 		| FOR '(' assignment  ';' logical_expression  ';' assignment ')'
 	;
 
 do_while_statement : DO  block while_declaraction
-		    | DO  {scope++;} block_statement {removeCurrentScope(); scope--;} while_declaraction
 			;
 
 switch_statement : SWITCH '('expression')'
@@ -383,21 +377,56 @@ function : VOID IDENTIFIER  '(' {activeFunctionType = typeVoid;} arguments')'  b
 	;
 
 function_call: IDENTIFIER '('argument_call')'  
+	{
+		int index = functionInTable((char*)$1, $3);
+		if(index == -1)
+			printf("error: function %s has not been declared before\n", (char*)$1);
+		else {
+			valueNode* val = (valueNode*)malloc(sizeof(valueNode));
+			val->type = getFunctionType(index);
+			$$ = val;
+		}
+	}
 	;
 
 argument_call: argument_call ',' expression  
+			{
+				Args* args = (Args*)$1;
+				if($3 != NULL) {
+					args->types[args->nargs] = $3->type;
+					args->nargs++;
+					$$ = args;	
+				}
+				else {
+					args->nargs = 0;
+					$$ = args;
+				}
+			}
 			| expression  
-			| %empty
+			{
+				Args* args = (Args*)malloc(sizeof(Args));
+				if($1 != NULL) {
+					args->types[0] = $1->type;
+					args->nargs = 1;
+					$$ = args;	
+				}
+				else {
+					args->nargs = 0;
+					$$ = args;
+				}
+			}
+			| %empty {Args* args = (Args*)malloc(sizeof(Args)); args->nargs = 0; $$ = args;}
 			;
 
 
 
-// we need to having continue and break inside an if inside a loop
-if_condition : IF '(' logical_expression ')'         
+if_condition : IF {
+		if(activeFunctionType == -1)
+			printf("error: if statement not in a function\n");
+	}  '(' logical_expression ')'         
 	;
 
-else_statement : ELSE block
-	       | ELSE block_statement         
+else_statement : ELSE block      
 		   ;
 
 %%
@@ -443,7 +472,9 @@ int checkArgs(Args* args1, Args* args2){
 		return 0;
 
 }
-
+int getFunctionType(int index){
+	return symbol_table[index].type;
+}
 int functionInTable(char* name, Args* args){
 	for (int i =0;i < idx;i++)
 		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0 && symbol_table[i].kind == functionKind && checkArgs(args, symbol_table[i].args) == 1) {
@@ -734,7 +765,7 @@ void comparisonOperations(char* operation, valueNode* par1, valueNode* par2, val
 
 valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) {
 	
-	if((par1 == NULL && par2 == NULL) || (par2 == NULL && strcmp(operation, "!") != 0) || par1 == NULL) {
+	if((par2 == NULL && strcmp(operation, "!") != 0) || par1 == NULL) {
 		return NULL;
 	}
 	int type1 = par1->type;

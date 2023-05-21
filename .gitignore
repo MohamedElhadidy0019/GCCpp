@@ -1,7 +1,6 @@
 test
 original.y
 symbol_table.log
-testcases.txt
 lex.yy.c
 parser.tab.h
 parser.tab.c
