@@ -69,6 +69,7 @@ int scope = 0;
 int idx = 0 ;
 int update = 0;
 int activeFunctionType = -1;
+int switchType = -1;
 int loop = 0;
 %}
 
@@ -312,10 +313,25 @@ do_while_statement : DO  block while_declaraction
 		    | DO  {scope++;} block_statement {removeCurrentScope(); scope--;} while_declaraction
 			;
 
-switch_statement : SWITCH '('expression')' '{' case_statement '}'
+switch_statement : SWITCH '('expression')'
+			{
+				if(activeFunctionType == -1)
+					printf("error: switch statement not in a function\n");
+				if($3 != NULL)
+					switchType = $3->type;
+			} 
+			'{' case_statement '}' {switchType = -1;}
 
 
-case_statement : CASE value ':' block case_statement 
+case_statement : CASE value ':' 
+		{
+			if(switchType == -1) 
+				printf("error: case statement not in a switch statement\n");
+			else {
+				checkType(switchType, $2, caseMismatch);
+			}
+			
+		} block case_statement 
 		| DEFAULT ':' block 
 		| %empty
 		;
