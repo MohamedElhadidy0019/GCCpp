@@ -89,7 +89,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 64 "parser.y"
+#line 69 "parser.y"
 
     int integer_value;
     float float_value;

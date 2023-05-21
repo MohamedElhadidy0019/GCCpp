@@ -4,6 +4,8 @@
 #include <stdio.h>
 # include "parser.h"
 
+FILE* logFile;
+
 void yyerror(char *s);
 int yylex();
 int yyparse();
@@ -39,9 +41,11 @@ void setUsed(int i);
 valueNode* setValueNode(int type, void* value);
 void addToSymbolTable(char* name , int type, int kind, valueNode* value);
 int inTable(char* name);
+int inTableGlobal(char* name);
 int checkType(int x , valueNode* y , int errorType);
 valueNode* Operations (char operation,valueNode* par1, valueNode* par2);
 valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2);
+void comparisonOperations(char* opeartion, valueNode* par1, valueNode* par2, valueNode* result);
 void addOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void subtractOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void multiplyOperation(valueNode* p, valueNode* val1, valueNode* val2);
@@ -49,6 +53,7 @@ void divideOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void modOperation(valueNode* p, valueNode* val1, valueNode* val2);
 valueNode* getIDValue(char* name);
 void printSymbolTable();
+void printSymbolTableCSV();
 void removeCurrentScope();
 void updateSymbolTable(char* name, valueNode* value);
 valueNode* getIDValue(char* name);
@@ -339,13 +344,23 @@ void addToSymbolTable(char* name , int type, int kind, valueNode* value) {
 	p.scope = scope;
 	p.value = value;
 	symbol_table[idx++] = p;
+
+	// print the symbol table as CSV
+	printSymbolTableCSV();
 } 
 int inTable(char* name){
 	for (int i =0;i < idx;i++)
-		if (!strcmp(name,symbol_table[i].name) && (symbol_table[i].scope == scope || symbol_table[i].scope < scope) && symbol_table[i].isUsed == 1)
+		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == scope  && symbol_table[i].isUsed == 1)
 			return i;  
 	return -1;
 } 
+
+int inTableGlobal(char* name){
+	for (int i =0;i < idx;i++)
+		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0)
+			return i;  
+	return -1;
+}
 
 int checkType(int x , valueNode* y , int errorType){
 	if (y != NULL && x != y->type){
@@ -542,6 +557,10 @@ valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
 				divideOperation(p, par1, par2);
 				break;
 			}
+			default: {
+				printf("operation not supported");
+				break;
+			}
 		}
 		return p;
 	}
@@ -549,13 +568,136 @@ valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
 	
 }
 
+void comparisonOperations(char* operation, valueNode* par1, valueNode* par2, valueNode* result) {
+
+	int type1 = par1->type;
+	switch(type1) {
+		case typeInteger: {
+			int val1 = par1->integer;
+			int val2 = par2->integer;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (val1 == val2);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (val1 != val2);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = (val1 > val2);
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = (val1 < val2);
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = (val1 >= val2);
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = (val1 <= val2);
+			}
+		}
+		case typeFloat: {
+			float val1 = par1->floatNumber;
+			float val2 = par2->floatNumber;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (val1 == val2);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (val1 != val2);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = (val1 > val2);
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = (val1 < val2);
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = (val1 >= val2);
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = (val1 <= val2);
+			}
+		}
+		case typeBoolean: {
+			int val1 = par1->boolean;
+			int val2 = par2->boolean;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (val1 == val2);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (val1 != val2);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = (val1 > val2);
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = (val1 < val2);
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = (val1 >= val2);
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = (val1 <= val2);
+			}
+		}
+		case typeCharchter: {
+			char val1 = par1->character;
+			char val2 = par2->character;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (val1 == val2);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (val1 != val2);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = (val1 > val2);
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = (val1 < val2);
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = (val1 >= val2);
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = (val1 <= val2);
+			}
+		}
+		case typeString: {
+			char* val1 = par1->name;
+			char* val2 = par2->name;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (strcmp(val1, val2) == 0);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (strcmp(val1, val2) != 0);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = 0;
+				printf("Error: cannot compare strings with >\n");
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = 0;
+				printf("Error: cannot compare strings with <\n");
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = 0;
+				printf("Error: cannot compare strings with >=\n");
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = 0;
+				printf("Error: cannot compare strings with <=\n");
+			}
+		}
+	}
+}
+
+
+
 valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) {
 	int type1 = par1->type;
 	int type2 = par2->type;
 	// check if the two types are the same
 	if (checkType(type1, par2, valueMismatch) == type1){
 		valueNode* p = (valueNode*)malloc(sizeof(valueNode));
-		p->type = type1;
+		p->type = typeBoolean;
 		if(strcmp(operation, "&&") == 0) {
 			p->boolean = par1->boolean && par2->boolean;
 		}
@@ -605,16 +747,22 @@ valueNode* getIDValue(char* name) {
 }
 
 void updateSymbolTable(char* name, valueNode* value) {
-	// check that the variable is in the symbol table
+	// check that the variable is in the symbol table in the global scope (scope = 0)
 	int index = inTable(name);
 	if (index == -1) {
-		printf("variable %s not declared\n", name);
-		return;
+		// here the variable is not in the current scope but it may be in the global scope
+		index = inTableGlobal(name);
+		if (index == -1) {
+			printf("variable %s not declared", name);
+			return;
+		}
 	}
 
 	// update the value of the variable
 	symbol_table[index].value = value;
 	
+	// print the symbol table as CSV
+	printSymbolTableCSV();	
 
 }
 
@@ -630,12 +778,109 @@ void removeCurrentScope() {
 }
 
 void printSymbolTable() {
+	// Open the log file
+    logFile = fopen("symbol_table.log", "a");
+    if (logFile == NULL) {
+        fprintf(stderr, "Error opening log file.\n");
+        exit(1);
+    }
 	update++;
-	printf("Symbol Table version %d:\n", update);
-	printf("====================================================\n");
+	fprintf(logFile, "Symbol Table version %d:\n", update);
+	fprintf(logFile, "====================================================\n");
 	int i;
 	for (i = 0; i < idx; i++) {
-		printf("name: %s, scope: %d, type: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].isUsed);
+		switch(symbol_table[i].type) {
+			case typeInteger: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->integer, symbol_table[i].isUsed);
+				break;
+			}
+			case typeFloat: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %f, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->floatNumber, symbol_table[i].isUsed);
+				break;
+			}
+			case typeString: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %s, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->name, symbol_table[i].isUsed);
+				break;
+			}
+			case typeBoolean: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->boolean, symbol_table[i].isUsed);
+				break;
+			}
+			case typeCharchter: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %c, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->character, symbol_table[i].isUsed);
+				break;
+			}
+			default: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].isUsed);
+				break;
+			}
+		}
 	}
-	printf("====================================================\n");
+	fprintf(logFile, "====================================================\n");
+
+	// Close the log file
+	fclose(logFile);
+}
+
+// this function prints the symbol table in the log file as a comma separated values
+void printSymbolTableCSV() {
+	// Open the log file
+	logFile = fopen("symbol_table.log", "a");
+	if (logFile == NULL) {
+		fprintf(stderr, "Error opening log file.\n");
+		exit(1);
+	}
+	//update++;
+	//fprintf(logFile, "%d,", update);
+	// print the fields names
+	fprintf(logFile, "name, scope, type, value\n");
+	int i;
+	for (i = 0; i < idx; i++) {
+		switch(symbol_table[i].type) {
+			case typeInteger: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->integer);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			case typeFloat: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%f\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->floatNumber);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			case typeString: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->name);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			case typeBoolean: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->boolean);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			case typeCharchter: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%c\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->character);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			default: {
+				fprintf(logFile, "%s,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type);
+				break;
+			}
+		}
+	}
+	// print a separator line
+	fprintf(logFile, "==================================================\n");
+
+	// Close the log file
+	fclose(logFile);
 }

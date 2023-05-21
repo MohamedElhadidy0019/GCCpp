@@ -73,6 +73,8 @@
 #include <stdio.h>
 # include "parser.h"
 
+FILE* logFile;
+
 void yyerror(char *s);
 int yylex();
 int yyparse();
@@ -108,9 +110,11 @@ void setUsed(int i);
 valueNode* setValueNode(int type, void* value);
 void addToSymbolTable(char* name , int type, int kind, valueNode* value);
 int inTable(char* name);
+int inTableGlobal(char* name);
 int checkType(int x , valueNode* y , int errorType);
 valueNode* Operations (char operation,valueNode* par1, valueNode* par2);
 valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2);
+void comparisonOperations(char* opeartion, valueNode* par1, valueNode* par2, valueNode* result);
 void addOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void subtractOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void multiplyOperation(valueNode* p, valueNode* val1, valueNode* val2);
@@ -118,6 +122,7 @@ void divideOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void modOperation(valueNode* p, valueNode* val1, valueNode* val2);
 valueNode* getIDValue(char* name);
 void printSymbolTable();
+void printSymbolTableCSV();
 void removeCurrentScope();
 void updateSymbolTable(char* name, valueNode* value);
 valueNode* getIDValue(char* name);
@@ -128,7 +133,7 @@ int scope = 0;
 int idx = 0 ;
 int update = 0;
 
-#line 132 "parser.tab.c"
+#line 137 "parser.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -216,7 +221,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 64 "parser.y"
+#line 69 "parser.y"
 
     int integer_value;
     float float_value;
@@ -226,7 +231,7 @@ union YYSTYPE
     char* identifier;
 	struct valueNodes* valueNode;
 
-#line 230 "parser.tab.c"
+#line 235 "parser.tab.c"
 
 };
 typedef union YYSTYPE YYSTYPE;
@@ -605,16 +610,16 @@ static const yytype_int8 yytranslate[] =
   /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
 static const yytype_int16 yyrline[] =
 {
-       0,   115,   115,   118,   119,   121,   122,   123,   124,   125,
-     126,   127,   128,   129,   130,   131,   132,   133,   134,   135,
-     136,   139,   139,   140,   143,   144,   147,   148,   151,   159,
-     166,   175,   178,   179,   182,   183,   186,   189,   190,   191,
-     192,   196,   197,   198,   201,   202,   203,   204,   207,   208,
-     211,   212,   213,   214,   215,   216,   217,   218,   219,   222,
-     223,   224,   225,   226,   229,   230,   231,   232,   233,   237,
-     238,   240,   246,   248,   249,   253,   254,   257,   258,   261,
-     262,   265,   268,   269,   270,   274,   275,   276,   279,   280,
-     283,   284,   287,   290,   291,   292,   298,   301,   302
+       0,   120,   120,   123,   124,   126,   127,   128,   129,   130,
+     131,   132,   133,   134,   135,   136,   137,   138,   139,   140,
+     141,   144,   144,   145,   148,   149,   152,   153,   156,   164,
+     171,   180,   183,   184,   187,   188,   191,   194,   195,   196,
+     197,   201,   202,   203,   206,   207,   208,   209,   212,   213,
+     216,   217,   218,   219,   220,   221,   222,   223,   224,   227,
+     228,   229,   230,   231,   234,   235,   236,   237,   238,   242,
+     243,   245,   251,   253,   254,   258,   259,   262,   263,   266,
+     267,   270,   273,   274,   275,   279,   280,   281,   284,   285,
+     288,   289,   292,   295,   296,   297,   303,   306,   307
 };
 #endif
 
@@ -1560,19 +1565,19 @@ yyreduce:
   switch (yyn)
     {
   case 21:
-#line 139 "parser.y"
+#line 144 "parser.y"
             {scope++;}
-#line 1566 "parser.tab.c"
+#line 1571 "parser.tab.c"
     break;
 
   case 22:
-#line 139 "parser.y"
+#line 144 "parser.y"
                                             {removeCurrentScope(); scope--;}
-#line 1572 "parser.tab.c"
+#line 1577 "parser.tab.c"
     break;
 
   case 28:
-#line 152 "parser.y"
+#line 157 "parser.y"
         {
 		if(inTable((char*)(yyvsp[0].identifier)) != -1)
 			// error that the variable has been declared before
@@ -1580,231 +1585,231 @@ yyreduce:
 		else
 			addToSymbolTable((char*)((yyvsp[0].identifier)),(yyvsp[-1].integer_value),identifierKind, NULL);
 	}
-#line 1584 "parser.tab.c"
+#line 1589 "parser.tab.c"
     break;
 
   case 29:
-#line 160 "parser.y"
+#line 165 "parser.y"
         {
 		if(inTable((char*)(yyvsp[-2].identifier)) != -1)
 			printf("error: Variable %s has been declared before\n", (char*)(yyvsp[-2].identifier));
 		else if ((yyvsp[0].valueNode) != NULL && checkType((yyvsp[-3].integer_value),(yyvsp[0].valueNode),valueMismatch) != -1); 
 			addToSymbolTable((char*)((yyvsp[-2].identifier)),(yyvsp[-3].integer_value),identifierKind, (yyvsp[0].valueNode));
 	}
-#line 1595 "parser.tab.c"
+#line 1600 "parser.tab.c"
     break;
 
   case 30:
-#line 167 "parser.y"
+#line 172 "parser.y"
         {
 		if(inTable((char*)(yyvsp[-2].identifier)) != -1)
 			printf("error: Constant %s has been declared before\n", (char*)(yyvsp[-2].identifier));
 		else if ((yyvsp[0].valueNode) != NULL && checkType((yyvsp[-3].integer_value),(yyvsp[0].valueNode),valueMismatch) != -1); 
 			addToSymbolTable((char*)((yyvsp[-2].identifier)),(yyvsp[-3].integer_value),constantKind, (yyvsp[0].valueNode));
 	}
-#line 1606 "parser.tab.c"
+#line 1611 "parser.tab.c"
     break;
 
   case 36:
-#line 186 "parser.y"
+#line 191 "parser.y"
                                         {updateSymbolTable((yyvsp[-2].identifier),(yyvsp[0].valueNode));}
-#line 1612 "parser.tab.c"
+#line 1617 "parser.tab.c"
     break;
 
   case 37:
-#line 189 "parser.y"
+#line 194 "parser.y"
                              { (yyval.valueNode) = (yyvsp[0].valueNode);}
-#line 1618 "parser.tab.c"
+#line 1623 "parser.tab.c"
     break;
 
   case 38:
-#line 190 "parser.y"
+#line 195 "parser.y"
                               { (yyval.valueNode) = (yyvsp[0].valueNode);}
-#line 1624 "parser.tab.c"
+#line 1629 "parser.tab.c"
     break;
 
   case 39:
-#line 191 "parser.y"
+#line 196 "parser.y"
                              { (yyval.valueNode) = (yyvsp[-1].valueNode);}
-#line 1630 "parser.tab.c"
+#line 1635 "parser.tab.c"
     break;
 
   case 40:
-#line 192 "parser.y"
+#line 197 "parser.y"
                              { (yyval.valueNode) = (yyvsp[0].valueNode);}
-#line 1636 "parser.tab.c"
+#line 1641 "parser.tab.c"
     break;
 
   case 41:
-#line 196 "parser.y"
+#line 201 "parser.y"
                                       {(yyval.valueNode) = Operations('+', (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1642 "parser.tab.c"
+#line 1647 "parser.tab.c"
     break;
 
   case 42:
-#line 197 "parser.y"
+#line 202 "parser.y"
                                               {(yyval.valueNode) = Operations('-', (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1648 "parser.tab.c"
+#line 1653 "parser.tab.c"
     break;
 
   case 43:
-#line 198 "parser.y"
+#line 203 "parser.y"
                                           {(yyval.valueNode) = (yyvsp[0].valueNode);}
-#line 1654 "parser.tab.c"
+#line 1659 "parser.tab.c"
     break;
 
   case 44:
-#line 201 "parser.y"
+#line 206 "parser.y"
                             {(yyval.valueNode) = Operations('*', (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1660 "parser.tab.c"
+#line 1665 "parser.tab.c"
     break;
 
   case 45:
-#line 202 "parser.y"
+#line 207 "parser.y"
                             {(yyval.valueNode) = Operations('/', (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1666 "parser.tab.c"
+#line 1671 "parser.tab.c"
     break;
 
   case 46:
-#line 203 "parser.y"
+#line 208 "parser.y"
                             {(yyval.valueNode) = Operations('%', (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1672 "parser.tab.c"
+#line 1677 "parser.tab.c"
     break;
 
   case 47:
-#line 204 "parser.y"
+#line 209 "parser.y"
                             {(yyval.valueNode) = (yyvsp[0].valueNode);}
-#line 1678 "parser.tab.c"
+#line 1683 "parser.tab.c"
     break;
 
   case 48:
-#line 207 "parser.y"
+#line 212 "parser.y"
                             {(yyval.valueNode) = (yyvsp[0].valueNode);}
-#line 1684 "parser.tab.c"
+#line 1689 "parser.tab.c"
     break;
 
   case 49:
-#line 208 "parser.y"
+#line 213 "parser.y"
                             {(yyval.valueNode) = getIDValue((yyvsp[0].identifier));}
-#line 1690 "parser.tab.c"
+#line 1695 "parser.tab.c"
     break;
 
   case 50:
-#line 211 "parser.y"
+#line 216 "parser.y"
                                       { (yyval.valueNode) = logicalOperations("!", (yyvsp[0].valueNode), NULL); }
-#line 1696 "parser.tab.c"
+#line 1701 "parser.tab.c"
     break;
 
   case 51:
-#line 212 "parser.y"
+#line 217 "parser.y"
                                           { (yyval.valueNode) = logicalOperations("<", (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1702 "parser.tab.c"
+#line 1707 "parser.tab.c"
     break;
 
   case 52:
-#line 213 "parser.y"
+#line 218 "parser.y"
                                           { (yyval.valueNode) = logicalOperations(">", (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1708 "parser.tab.c"
+#line 1713 "parser.tab.c"
     break;
 
   case 53:
-#line 214 "parser.y"
+#line 219 "parser.y"
                                                           { (yyval.valueNode) = logicalOperations(">=" , (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1714 "parser.tab.c"
+#line 1719 "parser.tab.c"
     break;
 
   case 54:
-#line 215 "parser.y"
+#line 220 "parser.y"
                                                           { (yyval.valueNode) = logicalOperations("<=", (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1720 "parser.tab.c"
+#line 1725 "parser.tab.c"
     break;
 
   case 55:
-#line 216 "parser.y"
+#line 221 "parser.y"
                                                           { (yyval.valueNode) = logicalOperations("&&", (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1726 "parser.tab.c"
+#line 1731 "parser.tab.c"
     break;
 
   case 56:
-#line 217 "parser.y"
+#line 222 "parser.y"
                                                           { (yyval.valueNode) = logicalOperations("||", (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1732 "parser.tab.c"
+#line 1737 "parser.tab.c"
     break;
 
   case 57:
-#line 218 "parser.y"
+#line 223 "parser.y"
                                                           { (yyval.valueNode) = logicalOperations("==", (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1738 "parser.tab.c"
+#line 1743 "parser.tab.c"
     break;
 
   case 58:
-#line 219 "parser.y"
+#line 224 "parser.y"
                                                           { (yyval.valueNode) = logicalOperations("!=", (yyvsp[-2].valueNode), (yyvsp[0].valueNode)); }
-#line 1744 "parser.tab.c"
+#line 1749 "parser.tab.c"
     break;
 
   case 59:
-#line 222 "parser.y"
+#line 227 "parser.y"
                      { (yyval.valueNode) = setValueNode(typeInteger, &(yyvsp[0].integer_value)); }
-#line 1750 "parser.tab.c"
+#line 1755 "parser.tab.c"
     break;
 
   case 60:
-#line 223 "parser.y"
+#line 228 "parser.y"
                          { (yyval.valueNode) = setValueNode(typeFloat, &(yyvsp[0].float_value)); }
-#line 1756 "parser.tab.c"
+#line 1761 "parser.tab.c"
     break;
 
   case 61:
-#line 224 "parser.y"
+#line 229 "parser.y"
                          { (yyval.valueNode) = setValueNode(typeFloat, &(yyvsp[0].boolean_value)); }
-#line 1762 "parser.tab.c"
+#line 1767 "parser.tab.c"
     break;
 
   case 62:
-#line 225 "parser.y"
+#line 230 "parser.y"
                          { (yyval.valueNode) = setValueNode(typeCharchter, &(yyvsp[0].char_value)); }
-#line 1768 "parser.tab.c"
+#line 1773 "parser.tab.c"
     break;
 
   case 63:
-#line 226 "parser.y"
+#line 231 "parser.y"
                          { (yyval.valueNode) = setValueNode(typeString, &(yyvsp[0].string_value)); }
-#line 1774 "parser.tab.c"
+#line 1779 "parser.tab.c"
     break;
 
   case 64:
-#line 229 "parser.y"
+#line 234 "parser.y"
                { (yyval.integer_value) = typeInteger; }
-#line 1780 "parser.tab.c"
+#line 1785 "parser.tab.c"
     break;
 
   case 65:
-#line 230 "parser.y"
+#line 235 "parser.y"
                    { (yyval.integer_value) = typeFloat; }
-#line 1786 "parser.tab.c"
+#line 1791 "parser.tab.c"
     break;
 
   case 66:
-#line 231 "parser.y"
+#line 236 "parser.y"
                    { (yyval.integer_value) = typeBoolean; }
-#line 1792 "parser.tab.c"
+#line 1797 "parser.tab.c"
     break;
 
   case 67:
-#line 232 "parser.y"
+#line 237 "parser.y"
                     { (yyval.integer_value) = typeCharchter; }
-#line 1798 "parser.tab.c"
+#line 1803 "parser.tab.c"
     break;
 
   case 68:
-#line 233 "parser.y"
+#line 238 "parser.y"
                     { (yyval.integer_value) = typeString; }
-#line 1804 "parser.tab.c"
+#line 1809 "parser.tab.c"
     break;
 
 
-#line 1808 "parser.tab.c"
+#line 1813 "parser.tab.c"
 
       default: break;
     }
@@ -2036,7 +2041,7 @@ yyreturn:
 #endif
   return yyresult;
 }
-#line 305 "parser.y"
+#line 310 "parser.y"
 
 
 //-------------------------------------------------------------------------------------------------
@@ -2074,13 +2079,23 @@ void addToSymbolTable(char* name , int type, int kind, valueNode* value) {
 	p.scope = scope;
 	p.value = value;
 	symbol_table[idx++] = p;
+
+	// print the symbol table as CSV
+	printSymbolTableCSV();
 } 
 int inTable(char* name){
 	for (int i =0;i < idx;i++)
-		if (!strcmp(name,symbol_table[i].name) && (symbol_table[i].scope == scope || symbol_table[i].scope < scope) && symbol_table[i].isUsed == 1)
+		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == scope  && symbol_table[i].isUsed == 1)
 			return i;  
 	return -1;
 } 
+
+int inTableGlobal(char* name){
+	for (int i =0;i < idx;i++)
+		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0)
+			return i;  
+	return -1;
+}
 
 int checkType(int x , valueNode* y , int errorType){
 	if (y != NULL && x != y->type){
@@ -2277,6 +2292,10 @@ valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
 				divideOperation(p, par1, par2);
 				break;
 			}
+			default: {
+				printf("operation not supported");
+				break;
+			}
 		}
 		return p;
 	}
@@ -2284,13 +2303,136 @@ valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
 	
 }
 
+void comparisonOperations(char* operation, valueNode* par1, valueNode* par2, valueNode* result) {
+
+	int type1 = par1->type;
+	switch(type1) {
+		case typeInteger: {
+			int val1 = par1->integer;
+			int val2 = par2->integer;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (val1 == val2);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (val1 != val2);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = (val1 > val2);
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = (val1 < val2);
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = (val1 >= val2);
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = (val1 <= val2);
+			}
+		}
+		case typeFloat: {
+			float val1 = par1->floatNumber;
+			float val2 = par2->floatNumber;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (val1 == val2);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (val1 != val2);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = (val1 > val2);
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = (val1 < val2);
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = (val1 >= val2);
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = (val1 <= val2);
+			}
+		}
+		case typeBoolean: {
+			int val1 = par1->boolean;
+			int val2 = par2->boolean;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (val1 == val2);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (val1 != val2);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = (val1 > val2);
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = (val1 < val2);
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = (val1 >= val2);
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = (val1 <= val2);
+			}
+		}
+		case typeCharchter: {
+			char val1 = par1->character;
+			char val2 = par2->character;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (val1 == val2);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (val1 != val2);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = (val1 > val2);
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = (val1 < val2);
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = (val1 >= val2);
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = (val1 <= val2);
+			}
+		}
+		case typeString: {
+			char* val1 = par1->name;
+			char* val2 = par2->name;
+			if(strcmp(operation, "==") == 0) {
+				result->boolean = (strcmp(val1, val2) == 0);
+			}
+			else if(strcmp(operation, "!=") == 0) {
+				result->boolean = (strcmp(val1, val2) != 0);
+			}
+			else if(strcmp(operation, ">") == 0) {
+				result->boolean = 0;
+				printf("Error: cannot compare strings with >\n");
+			}
+			else if(strcmp(operation, "<") == 0) {
+				result->boolean = 0;
+				printf("Error: cannot compare strings with <\n");
+			}
+			else if(strcmp(operation, ">=") == 0) {
+				result->boolean = 0;
+				printf("Error: cannot compare strings with >=\n");
+			}
+			else if(strcmp(operation, "<=") == 0) {
+				result->boolean = 0;
+				printf("Error: cannot compare strings with <=\n");
+			}
+		}
+	}
+}
+
+
+
 valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) {
 	int type1 = par1->type;
 	int type2 = par2->type;
 	// check if the two types are the same
 	if (checkType(type1, par2, valueMismatch) == type1){
 		valueNode* p = (valueNode*)malloc(sizeof(valueNode));
-		p->type = type1;
+		p->type = typeBoolean;
 		if(strcmp(operation, "&&") == 0) {
 			p->boolean = par1->boolean && par2->boolean;
 		}
@@ -2340,16 +2482,22 @@ valueNode* getIDValue(char* name) {
 }
 
 void updateSymbolTable(char* name, valueNode* value) {
-	// check that the variable is in the symbol table
+	// check that the variable is in the symbol table in the global scope (scope = 0)
 	int index = inTable(name);
 	if (index == -1) {
-		printf("variable %s not declared\n", name);
-		return;
+		// here the variable is not in the current scope but it may be in the global scope
+		index = inTableGlobal(name);
+		if (index == -1) {
+			printf("variable %s not declared", name);
+			return;
+		}
 	}
 
 	// update the value of the variable
 	symbol_table[index].value = value;
 	
+	// print the symbol table as CSV
+	printSymbolTableCSV();	
 
 }
 
@@ -2365,12 +2513,109 @@ void removeCurrentScope() {
 }
 
 void printSymbolTable() {
+	// Open the log file
+    logFile = fopen("symbol_table.log", "a");
+    if (logFile == NULL) {
+        fprintf(stderr, "Error opening log file.\n");
+        exit(1);
+    }
 	update++;
-	printf("Symbol Table version %d:\n", update);
-	printf("====================================================\n");
+	fprintf(logFile, "Symbol Table version %d:\n", update);
+	fprintf(logFile, "====================================================\n");
 	int i;
 	for (i = 0; i < idx; i++) {
-		printf("name: %s, scope: %d, type: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].isUsed);
+		switch(symbol_table[i].type) {
+			case typeInteger: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->integer, symbol_table[i].isUsed);
+				break;
+			}
+			case typeFloat: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %f, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->floatNumber, symbol_table[i].isUsed);
+				break;
+			}
+			case typeString: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %s, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->name, symbol_table[i].isUsed);
+				break;
+			}
+			case typeBoolean: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->boolean, symbol_table[i].isUsed);
+				break;
+			}
+			case typeCharchter: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, value: %c, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->character, symbol_table[i].isUsed);
+				break;
+			}
+			default: {
+				fprintf(logFile, "name: %s, scope: %d, type: %d, isUsed: %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].isUsed);
+				break;
+			}
+		}
 	}
-	printf("====================================================\n");
+	fprintf(logFile, "====================================================\n");
+
+	// Close the log file
+	fclose(logFile);
+}
+
+// this function prints the symbol table in the log file as a comma separated values
+void printSymbolTableCSV() {
+	// Open the log file
+	logFile = fopen("symbol_table.log", "a");
+	if (logFile == NULL) {
+		fprintf(stderr, "Error opening log file.\n");
+		exit(1);
+	}
+	//update++;
+	//fprintf(logFile, "%d,", update);
+	// print the fields names
+	fprintf(logFile, "name, scope, type, value\n");
+	int i;
+	for (i = 0; i < idx; i++) {
+		switch(symbol_table[i].type) {
+			case typeInteger: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->integer);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			case typeFloat: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%f\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->floatNumber);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			case typeString: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->name);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			case typeBoolean: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->boolean);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			case typeCharchter: {
+				if(symbol_table[i].value != NULL)
+					fprintf(logFile, "%s,%d,%d,%c\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].value->character);
+				else
+					fprintf(logFile, "%s,%d,%d,%s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, "garbage");
+				break;
+			}
+			default: {
+				fprintf(logFile, "%s,%d,%d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type);
+				break;
+			}
+		}
+	}
+	// print a separator line
+	fprintf(logFile, "==================================================\n");
+
+	// Close the log file
+	fclose(logFile);
 }

@@ -2034,6 +2034,10 @@ int main(int argc, char* argv[]) {
     // Set the input file for the parser to read from
     yyin = inputFile;
 
+    // clear the symbol table log file
+    FILE* symbolTableFile = fopen("symbol_table.log", "w");
+    fclose(symbolTableFile);
+
     // Call the parser
     yyparse();
 
