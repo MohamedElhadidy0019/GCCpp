@@ -277,7 +277,7 @@ while_statement: while_declaraction  block
 
 while_declaraction : WHILE 	{
 		if(activeFunctionType == -1)
-			printf("error: while statement not in a function\n");
+			printf("error: while/do while statement not in a function\n");
 	}  '(' logical_expression ')'
 	;
 
@@ -309,7 +309,7 @@ for_declaration: FOR '(' variable_declaration  ';' logical_expression  ';' assig
 	;
 
 do_while_statement : DO  block while_declaraction
-		    | DO  block_statement while_declaraction
+		    | DO  {scope++;} block_statement {removeCurrentScope(); scope--;} while_declaraction
 			;
 
 switch_statement : SWITCH '('expression')' '{' case_statement '}'
@@ -638,6 +638,8 @@ void divideOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 
 // TODO: Don't forget to generate Quadruples for each operation
 valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
+	if(par1 == NULL || par2 == NULL)
+		return NULL;
 	int type1 = par1->type;
 	int type2 = par2->type;
 	// check if the two types are the same
@@ -779,7 +781,7 @@ void updateSymbolTable(char* name, valueNode* value) {
 		// here the variable is not in the current scope but it may be in the global scope
 		index = inTableGlobal(name);
 		if (index == -1) {
-			printf("variable %s not declared", name);
+			printf("variable %s not declared\n", name);
 			return;
 		}
 	}
