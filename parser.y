@@ -69,6 +69,7 @@ int scope = 0;
 int idx = 0 ;
 int update = 0;
 int activeFunctionType = -1;
+int loop = 0;
 %}
 
 /* Define yylval union */
@@ -208,7 +209,19 @@ enum_item: IDENTIFIER '=' INTEGER_TYPE
     | IDENTIFIER
     ;
 
-assignment : IDENTIFIER '=' expression  {updateSymbolTable($1,$3);}
+assignment : IDENTIFIER '=' expression  
+	{
+		if(loop == 0)
+			updateSymbolTable($1,$3);
+		else {
+			if(inTable($1) == -1)
+				printf("error: Variable %s has not been declared before\n", $1);
+			else {
+				int type = getIDValue($1)->type;
+				checkType(type, $3, valueMismatch);  
+			}
+		}
+	}
     ; 
 
 expression: math_expression  { $$ = $1;}
@@ -260,9 +273,12 @@ data_type: INT { $$ = typeInteger; }
 
 
 while_statement: while_declaraction  block 
-	| while_declaraction block_statement
+	| while_declaraction {scope++;} block_statement {removeCurrentScope(); scope--;}
 
-while_declaraction : WHILE '(' logical_expression ')' 
+while_declaraction : WHILE 	{
+		if(activeFunctionType == -1)
+			printf("error: while statement not in a function\n");
+	}  '(' logical_expression ')'
 	;
 
 
@@ -276,11 +292,20 @@ argument_print: argument_print ',' expression
 
 
 for_statement: for_declaration  block 
-	| for_declaration block_statement
+	{
+		if(activeFunctionType == -1)
+			printf("error: for statement not in a function\n");	
+	}
+	| for_declaration {scope++;} block_statement 
+	{
+		removeCurrentScope(); 
+		scope--;
+	}
 	;
 
 for_declaration: FOR '(' variable_declaration  ';' logical_expression  ';' assignment ')'
-				| FOR '(' assignment  ';' logical_expression  ';' assignment ')'
+
+		| FOR '(' assignment  ';' logical_expression  ';' assignment ')'
 	;
 
 do_while_statement : DO  block while_declaraction
@@ -475,7 +500,7 @@ int inTable(char* name){
 
 int inTableGlobal(char* name){
 	for (int i =0;i < idx;i++)
-		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0)
+		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope < scope  && symbol_table[i].isUsed == 1)
 			return i;  
 	return -1;
 }
@@ -690,6 +715,10 @@ void comparisonOperations(char* operation, valueNode* par1, valueNode* par2, val
 
 
 valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) {
+	
+	if((par1 == NULL && par2 == NULL) || (par2 == NULL && strcmp(operation, "!") != 0) || par1 == NULL) {
+		return NULL;
+	}
 	int type1 = par1->type;
 	int type2 = par2->type;
 	// check if the two types are the same
@@ -717,16 +746,21 @@ valueNode* getIDValue(char* name) {
 	// check that the variable is in the symbol table
 	int index = inTable(name);
 	if (index == -1) {
-		printf("variable %s not declared in this scope\n", name);
-		return NULL;
+		// the variable is not in the current scope but it may be in the global scope
+		index = inTableGlobal(name);
+		if (index == -1) {
+			printf("variable %s not declared\n", name);
+			return NULL;
+		}
+		else {
+			// return the value of the variable
+			return symbol_table[index].value;
+		}
 	}
-	// check that the variable is initialized
-	if (symbol_table[index].isUsed == 0) {
-		yyerror("variable not initialized");
-		return NULL;
+	else {
+		// return the value of the variable
+		return symbol_table[index].value;
 	}
-	// return the value of the variable
-	return symbol_table[index].value;
 }
 
 int getActiveFunctionType() {
