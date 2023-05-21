@@ -149,7 +149,7 @@ block_statement : declaration ';'
 		| BREAK ';'
         ;
 
-block : '{' {scope++;} block_statements '}' {activeFunctionType = -1; removeCurrentScope(); scope--;}  
+block : '{' {scope++;} block_statements '}' {removeCurrentScope(); scope--;}  
 	  | '{' '}'
 	;
 
@@ -337,8 +337,8 @@ argument : data_type IDENTIFIER
 	}
 	;
 	
-function : VOID IDENTIFIER  '(' {activeFunctionType = typeVoid;} arguments')'  block  {addFunctionToSymbolTable($2,typeVoid,functionKind, $5);}
-	|  data_type IDENTIFIER  '(' {activeFunctionType = $1;} arguments')'  block  {addFunctionToSymbolTable($2,$1,functionKind, $5);}
+function : VOID IDENTIFIER  '(' {activeFunctionType = typeVoid;} arguments')'  block  {activeFunctionType = -1; addFunctionToSymbolTable($2,typeVoid,functionKind, $5);}
+	|  data_type IDENTIFIER  '(' {activeFunctionType = $1;} arguments')'  block  {activeFunctionType = -1; addFunctionToSymbolTable($2,$1,functionKind, $5);}
 	;
 
 function_call: IDENTIFIER '('argument_call')'  

@@ -1588,7 +1588,7 @@ yyreduce:
 
   case 22:
 #line 152 "parser.y"
-                                            {activeFunctionType = -1; removeCurrentScope(); scope--;}
+                                            {removeCurrentScope(); scope--;}
 #line 1593 "parser.tab.c"
     break;
 
@@ -1911,7 +1911,7 @@ yyreduce:
 
   case 91:
 #line 340 "parser.y"
-                                                                                      {addFunctionToSymbolTable((yyvsp[-5].identifier),typeVoid,functionKind, (yyvsp[-2].fnArgs));}
+                                                                                      {activeFunctionType = -1; addFunctionToSymbolTable((yyvsp[-5].identifier),typeVoid,functionKind, (yyvsp[-2].fnArgs));}
 #line 1916 "parser.tab.c"
     break;
 
@@ -1923,7 +1923,7 @@ yyreduce:
 
   case 93:
 #line 341 "parser.y"
-                                                                                     {addFunctionToSymbolTable((yyvsp[-5].identifier),(yyvsp[-6].integer_value),functionKind, (yyvsp[-2].fnArgs));}
+                                                                                     {activeFunctionType = -1; addFunctionToSymbolTable((yyvsp[-5].identifier),(yyvsp[-6].integer_value),functionKind, (yyvsp[-2].fnArgs));}
 #line 1928 "parser.tab.c"
     break;
 
