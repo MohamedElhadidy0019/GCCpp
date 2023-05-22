@@ -394,7 +394,11 @@ while_declaraction : WHILE 	{
 
   
 
-print_statement : PRINT '(' argument_print ')'
+print_statement : PRINT '(' argument_print ')' 
+	{
+		if(activeFunctionType == -1)
+			printf("error: print statement near line %d not in a function\n", yylineno);
+	}
 	;
 argument_print: argument_print ',' expression
 			| expression
