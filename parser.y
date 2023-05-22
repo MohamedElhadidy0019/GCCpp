@@ -5,6 +5,7 @@
 # include "parser.h"
 
 FILE* logFile;
+extern int yylineno;
 
 void yyerror(char *s);
 int yylex();
@@ -161,12 +162,12 @@ block_statement : declaration ';'
         | CONTINUE ';'
 		{
 			if(loop == 0)
-				printf("error: continue statement not in a loop\n");
+				printf("error: continue statement not in a loop near line %d\n", yylineno);
 		}
 		| BREAK ';'
 		{
 			if(loop == 0)
-				printf("error: break statement not in a loop\n");
+				printf("error: break statement not in a loop near line %d\n", yylineno);
 		}
         ;
 
@@ -182,7 +183,7 @@ functionBlock: '{' {scope++;} block_statements '}' {removeCurrentScope(); scope-
 return_statement : RETURN expression 
 	{
 		if(activeFunctionType == -1)
-			printf("error: return statement not in a function\n");
+			printf("error: return statement not in a function near line %d\n", yylineno);
 		else {
 			checkType(activeFunctionType, $2, returnMismatch);
 		}
@@ -191,9 +192,9 @@ return_statement : RETURN expression
 	| RETURN 
 	{
 		if(activeFunctionType == -1)
-			printf("error: return statement not in a function\n");
+			printf("error: return statement not in a function near line %d\n", yylineno);
 		else if(activeFunctionType != typeVoid) {
-			printf("error: return type mismatch\n");
+			printf("error: return type mismatch near line %d\n", yylineno);
 		}
 		activeFunctionType = -1;
 		
@@ -208,21 +209,21 @@ variable_declaration: data_type IDENTIFIER
 	{
 		if(inTable((char*)$2) != -1)
 			// error that the variable has been declared before
-			printf("error: Variable %s has been declared before\n", (char*)$2);
+			printf("error: Variable %s at line %d has been declared before\n", (char*)$2, yylineno);
 		else
 			addToSymbolTable((char*)($2),$1,identifierKind, NULL);
 	}
 	| data_type IDENTIFIER '=' expression
 	{
 		if(inTable((char*)$2) != -1)
-			printf("error: Variable %s has been declared before\n", (char*)$2);
+			printf("error: Variable %s at line %d has been declared before\n", (char*)$2, yylineno);
 		else if ($4 != NULL && checkType($1,$4,valueMismatch) != -1); 
 			addToSymbolTable((char*)($2),$1,identifierKind, $4);
 	}
 	| CONSTANT data_type IDENTIFIER '=' expression      
 	{
 		if(inTable((char*)$3) != -1)
-			printf("error: Constant %s has been declared before\n", (char*)$3);
+			printf("error: Constant %s at line %d has been declared before\n", (char*)$3, yylineno);
 		else if ($5 != NULL && checkType($2,$5,valueMismatch) != -1) { 
 			valueNode* p = $5;
 			p->enumName = NULL;
@@ -237,15 +238,15 @@ enum_usage: IDENTIFIER IDENTIFIER '=' IDENTIFIER
 	{	
 		int index = checkEnumIsActive((char*)$1); 
 		if(index == -1) {
-			printf("error: There is no Enum with name (%s)\n", (char*)$1);
+			printf("error: There is no Enum with name (%s) at line %d\n", (char*)$1, yylineno);
 		}
 		else {
 			if(inTable((char*)$2) != -1)
-				printf("error: This identifier (%s) has been declared before\n", (char*)$2);
+				printf("error: This identifier (%s) at line %d has been declared before\n", (char*)$2, yylineno);
 			else {
 				valueNode* p = getEnumValue((char*)$4, $1, index);
 				if(p == NULL)
-					printf("error: Enum item (%s) has not been declared before in Enum (%s)\n", (char*)$4, (char*)$1);
+					printf("error: Enum item (%s) at line %d has not been declared before in Enum (%s)\n", (char*)$4, yylineno, (char*)$1);
 				else {
 					valueNode* q = (valueNode*)malloc(sizeof(valueNode));
 					q->type = p->type;
@@ -261,7 +262,7 @@ enum_usage: IDENTIFIER IDENTIFIER '=' IDENTIFIER
 enum_declaration: ENUM IDENTIFIER '{' enum_list '}'
 	{
 		if(inTable((char*)$2) != -1)
-			printf("error: Enum name (%s) has been declared before\n", (char*)$2);
+			printf("error: Enum name (%s) at line %d has been declared before\n", (char*)$2, yylineno);
 		else {
 			valueNode* p = (valueNode*)malloc(sizeof(valueNode));
 			p->type = enumType;
@@ -272,7 +273,7 @@ enum_declaration: ENUM IDENTIFIER '{' enum_list '}'
 			int i;
 			for(i = 0; i < list->nvals; i++) {
 				if(inTable(list->names[i]) != -1)
-					printf("error: Enum item (%s) has been declared before\n", list->names[i]);
+					printf("error: Enum item (%s) at line %d has been declared before\n", list->names[i], yylineno);
 				else {
 					valueNode* p = (valueNode*)malloc(sizeof(valueNode));
 					p->type = typeInteger;
@@ -299,7 +300,7 @@ enum_list: enum_item
 		EnumList* list = $1;
 		EnumNode* node = $3;
 		if(checkRepeatNames(list, node->name) == 1)
-			printf("error: Enum item (%s) has been declared before\n", node->name);
+			printf("error: Enum item (%s) near line %d has been declared before\n", node->name, yylineno);
 		else {
 			list->nvals++;
 			list->names[list->nvals-1] = node->name;
@@ -324,7 +325,7 @@ assignment : IDENTIFIER '=' expression
 			updateSymbolTable($1,$3);
 		else {
 			if(inTable($1) == -1)
-				printf("error: Variable %s has not been declared before\n", $1);
+				printf("error: Variable %s at line %d has not been declared before\n", $1, yylineno);
 			else {
 				int type = getIDValue($1)->type;
 				checkType(type, $3, valueMismatch);  
@@ -386,7 +387,7 @@ while_statement: while_declaraction {loop=1;} block {loop = 0;}
 
 while_declaraction : WHILE 	{
 		if(activeFunctionType == -1)
-			printf("error: while/do while statement not in a function\n");
+			printf("error: while/do while statement at line %d not in a function\n", yylineno);
 	}  '(' logical_expression ')'
 	;
 
@@ -403,7 +404,7 @@ argument_print: argument_print ',' expression
 for_statement: for_declaration {loop=1;} block {loop=0;}
 	{
 		if(activeFunctionType == -1)
-			printf("error: for statement not in a function\n");	
+			printf("error: for statement near line %d not in a function\n", yylineno);	
 	}
 	;
 
@@ -418,7 +419,7 @@ do_while_statement : DO {loop = 1;} block {loop=0;} while_declaraction
 switch_statement : SWITCH '('expression')'
 			{
 				if(activeFunctionType == -1)
-					printf("error: switch statement not in a function\n");
+					printf("error: switch statement near line %d not in a function\n", yylineno);
 				if($3 != NULL)
 					switchType = $3->type;
 			} 
@@ -428,7 +429,7 @@ switch_statement : SWITCH '('expression')'
 case_statement : CASE value ':' 
 		{
 			if(switchType == -1) 
-				printf("error: case statement not in a switch statement\n");
+				printf("error: case statement near line %d not in a switch statement\n", yylineno);
 			else {
 				checkType(switchType, $2, caseMismatch);
 			}
@@ -460,7 +461,7 @@ arguments: arguments ',' argument
 argument : data_type IDENTIFIER 
 	{
 		if(inTable((char*)$2) != -1)
-			printf("error: Variable %s has been declared before\n", (char*)$2);
+			printf("error: Variable %s at line %d has been declared before\n", (char*)$2, yylineno);
 		else {
 			addToSymbolTable((char*)$2,$1,functionKind, NULL);
 			$$ = $1;
@@ -471,7 +472,7 @@ argument : data_type IDENTIFIER
 		int check = checkType($1,$4,funArgMismatch);
 		if(check != -1) {
 			if(inTable((char*)$2) != -1)
-				printf("error: Variable %s has been declared before\n", (char*)$2);
+				printf("error: Variable %s near line %d has been declared before\n", (char*)$2, yylineno);
 			else if ($4 != NULL && checkType($1,$4,valueMismatch) != -1) {
 				addToSymbolTable((char*)$2,$1,functionKind, $4);
 				$$ = $1;
@@ -483,14 +484,14 @@ argument : data_type IDENTIFIER
 function : VOID IDENTIFIER  '(' {activeFunctionType = typeVoid;} arguments')'  functionBlock
 	{
 		if(activeFunctionType != -1) {
-			printf("error: function %s() doesn't have return statement\n", (char*)$2);
+			printf("error: function %s() near line %d doesn't have return statement\n", (char*)$2, yylineno);
 		}
 		addFunctionToSymbolTable($2,typeVoid,functionKind, $5);
 	}
 	|  data_type IDENTIFIER  '(' {activeFunctionType = $1;} arguments')'  functionBlock 
 	{
 		if(activeFunctionType != -1) {
-			printf("error: function %s() doesn't have return statement\n", (char*)$2);
+			printf("error: function %s() near line %d doesn't have return statement\n", (char*)$2, yylineno);
 		}
 		addFunctionToSymbolTable($2,$1,functionKind, $5);
 	}
@@ -500,7 +501,7 @@ function_call: IDENTIFIER '('argument_call')'
 	{
 		int index = functionInTable((char*)$1, $3);
 		if(index == -1)
-			printf("error: function %s has not been declared before\n", (char*)$1);
+			printf("error: function %s near line %d has not been declared before\n", (char*)$1, yylineno);
 		else {
 			valueNode* val = (valueNode*)malloc(sizeof(valueNode));
 			val->type = getFunctionType(index);
@@ -542,7 +543,7 @@ argument_call: argument_call ',' expression
 
 if_condition : IF {
 		if(activeFunctionType == -1)
-			printf("error: if statement not in a function\n");
+			printf("error: if statement near line %d not in a function\n", yylineno);
 	}  '(' logical_expression ')'         
 	;
 
@@ -553,7 +554,7 @@ else_statement : ELSE block
 
 //-------------------------------------------------------------------------------------------------
 void yyerror(char *s) {
-    fprintf(stdout, "%s\n", s);
+    fprintf(stdout, "%s near line %d\n", s, yylineno);
 }
 
 
@@ -651,11 +652,11 @@ int functionInTable(char* name, Args* args){
 
 void addFunctionToSymbolTable(char* name, int type, int kind, Args* args){
 	if(scope != 0){
-		printf("Error: function %s  must be global\n", name);
+		printf("Error: function %s near line %d must be global\n", name, yylineno);
 	}
 	else {
 		if (functionInTable(name, args) != -1){
-			printf("Error: function %s is already defined\n", name);
+			printf("Error: function %s near line %d is already defined\n", name, yylineno);
 		}
 		else{
 			struct STNode p;
@@ -720,25 +721,25 @@ int checkType(int x , valueNode* y , int errorType){
 	if (y != NULL && x != y->type){
 		switch (errorType){
 			case valueMismatch:
-				yyerror("variable/constant mismatches with the assigned value "); 
+				printf("variable/constant at line %d mismatches with the assigned value ", yylineno); 
 				break; 
 			case ifCondBoolErr:
-				yyerror("if condition  must be of type boolean ");  
+				printf("if condition near line %d must be of type boolean ", yylineno);  
 				break;
 			case whileCondBoolErr:
-				yyerror("while condition must be of type boolean ");  
+				printf("while condition near line %d must be of type boolean ", yylineno);  
 				break;
 			case forCondBoolErr:
-				yyerror("for condition must be of type boolean ");  
+				printf("for condition near line %d must be of type boolean ", yylineno);  
 				break;
 			case caseMismatch:
-				yyerror("case variable type must be same as switch variable type ");  
+				printf("case variable near line %d type must be same as switch variable type ", yylineno);  
 				break;
 			case returnMismatch:
-				yyerror("return type must be the same as function type ");  
+				printf("return type at line %d must be the same as function type ", yylineno);  
 				break;
 			case funArgMismatch:
-				yyerror("function argument value must be the same as function argument type "); 
+				printf("function argument value near line %d must be the same as function argument type ", yylineno); 
 				break;
 		}
 		return -1;
@@ -755,7 +756,7 @@ void addOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 			break;
 		case typeString: {
 			// error string does not support addition
-			printf("string does not support addition");
+			printf("string does not support addition near line %d", yylineno);
 			break;
 		}
 	}
@@ -770,7 +771,7 @@ void subOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 			break;
 		case typeString: {
 			// error string does not support subtraction
-			printf("string does not support subtraction");
+			printf("string does not support subtraction near line %d", yylineno);
 			break;
 		}
 	}
@@ -785,7 +786,7 @@ void multiplyOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 			break;
 		case typeString: {
 			// error string does not support subtraction
-			printf("string does not support multiplication");
+			printf("string does not support multiplication near line %d", yylineno);
 			break;
 		}
 	}
@@ -795,24 +796,24 @@ void modeOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 	switch(p->type) {
 		case typeInteger: {
 			if (val2->integer == 0)
-				yyerror("division by zero"); 
+				printf("division by zero at line %d", yylineno); 
 			break;
 		}
 		case typeFloat: {
-			printf("Float values do not support mode operation");
+			printf("Float values do not support mode operation at line %d", yylineno);
 			if (val2->floatNumber == 0.0)
-				yyerror("division by zero"); 
+				printf("division by zero at line %d", yylineno); 
 			break;
 		}
 		case typeBoolean: {
-			printf("Boolean values do not support mode operation");
+			printf("Boolean values do not support mode operation at line %d", yylineno);
 			break;
 		}
 		case typeCharchter: 
 		  	break;
 		case typeString: {
 			// error string does not support subtraction
-			printf("String values do not support mode operation");
+			printf("String values do not support mode operation at line %d", yylineno);
 			break;
 		}
 	}
@@ -822,25 +823,25 @@ void divideOperation(valueNode* p, valueNode* val1, valueNode* val2) {
 	switch(p->type) {
 		case typeInteger: {
 			if (val2->integer == 0)
-				yyerror("division by zero"); 
+				printf("division by zero at line %d", yylineno); 
 			break;
 		}
 		case typeFloat: {
 			if (val2->floatNumber == 0.0)
-				yyerror("division by zero"); 
+				printf("division by zero at line %d", yylineno); 
 			break;
 		}
 		case typeBoolean: {
-			printf("boolean does not support divide operation");
+			printf("boolean does not support divide operation at line %d", yylineno);
 			break;
 		}
 		case typeCharchter: {
-			printf("character does not support divide operation");
+			printf("character does not support divide operation at line %d", yylineno);
 			break;
 		}
 		case typeString: {
 			// error string does not support subtraction
-			printf("string does not support divide operation");
+			printf("string does not support divide operation at line %d", yylineno);
 			break;
 		}
 	}
@@ -879,7 +880,7 @@ valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
 				break;
 			}
 			default: {
-				printf("operation not supported");
+				printf("operation not supported near line %d", yylineno);
 				break;
 			}
 		}
@@ -903,23 +904,23 @@ void comparisonOperations(char* operation, valueNode* par1, valueNode* par2, val
 		case typeString: {
 			if(strcmp(operation, "==") == 0) {
 				//result->boolean = (strcmp(val1, val2) == 0);
-				printf("Error: cannot compare strings with ==\n");
+				printf("Error: cannot compare strings with (==) at line %d\n", yylineno);
 			}
 			else if(strcmp(operation, "!=") == 0) {
 				//result->boolean = (strcmp(val1, val2) != 0);
-				printf("Error: cannot compare strings with !=\n");
+				printf("Error: cannot compare strings with (!=) at line %d\n", yylineno);
 			}
 			else if(strcmp(operation, ">") == 0) {
-				printf("Error: cannot compare strings with >\n");
+				printf("Error: cannot compare strings with (>) at line %d\n", yylineno);
 			}
 			else if(strcmp(operation, "<") == 0) {
-				printf("Error: cannot compare strings with <\n");
+				printf("Error: cannot compare strings with (<) at line %d\n", yylineno);
 			}
 			else if(strcmp(operation, ">=") == 0) {
-				printf("Error: cannot compare strings with >=\n");
+				printf("Error: cannot compare strings with (>=) at line %d\n", yylineno);
 			}
 			else if(strcmp(operation, "<=") == 0) {
-				printf("Error: cannot compare strings with <=\n");
+				printf("Error: cannot compare strings with (<=) at line %d\n", yylineno);
 			}
 		}
 	}
@@ -962,7 +963,7 @@ valueNode* getIDValue(char* name) {
 		// the variable is not in the current scope but it may be in the global scope
 		index = inTableGlobal(name);
 		if (index == -1) {
-			printf("Identifier (%s) not declared\n", name);
+			printf("Identifier (%s) at line %d not declared before\n", name, yylineno);
 			return NULL;
 		}
 		else {
@@ -992,7 +993,7 @@ void updateSymbolTable(char* name, valueNode* value) {
 		// here the variable is not in the current scope but it may be in the global scope
 		index = inTableGlobal(name);
 		if (index == -1) {
-			printf("variable %s not declared\n", name);
+			printf("variable %s at line %d not declared before\n", name, yylineno);
 			return;
 		}
 	}
@@ -1028,11 +1029,22 @@ void printSymbolTableCSV() {
 	//update++;
 	//fprintf(logFile, "%d,", update);
 	// print the fields names
-	fprintf(logFile, "name, scope, type, kind\n");
+	fprintf(logFile, "name, scope, type, kind, nargs, argsTypes\n");
 	int i;
 	for (i = 0; i < idx; i++) {
 		// print each entry in the symbol table as a comma separated values regardelss of the value
-		fprintf(logFile, "%s, %d, %d, %d\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
+		if(symbol_table[i].kind == functionKind) {
+			fprintf(logFile, "%s, %d, %d, %d, %d, ", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].args->nargs);
+			fprintf(logFile, "[ ");
+			for (int j = 0; j < symbol_table[i].args->nargs; j++) {
+				fprintf(logFile, "%d, ", symbol_table[i].args->types[j]);
+			}
+			fprintf(logFile, "]\n");
+		}
+		else {
+			fprintf(logFile, "%s, %d, %d, %d, NA, NA\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
+		}
+
 	}
 	// print a separator line
 	fprintf(logFile, "==================================================\n");

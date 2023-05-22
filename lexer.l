@@ -8,7 +8,10 @@
     extern FILE* yyin;
 %}
 
+%option yylineno  
+
 %%
+
 
 if          return IF;
 else        return ELSE;

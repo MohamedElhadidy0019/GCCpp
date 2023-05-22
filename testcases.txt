@@ -3,15 +3,5 @@ int add(int x, int y) {
     
 }
 
-int add(int x) {
-    return x;
-}
-
-int week = 0;
-
-void main() {    
-
-    return;
-    
-}
+int x
 
