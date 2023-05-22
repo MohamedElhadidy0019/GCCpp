@@ -5,3 +5,5 @@ lex.yy.c
 parser.tab.h
 parser.tab.c
 a.out
+.vscode
+a.exe
