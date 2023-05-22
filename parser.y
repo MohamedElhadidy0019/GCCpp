@@ -185,8 +185,8 @@ return_statement : RETURN expression
 			printf("error: return statement not in a function\n");
 		else {
 			checkType(activeFunctionType, $2, returnMismatch);
-			activeFunctionType = -1;
 		}
+		activeFunctionType = -1;
 	}	
 	| RETURN 
 	{
@@ -194,8 +194,8 @@ return_statement : RETURN expression
 			printf("error: return statement not in a function\n");
 		else if(activeFunctionType != typeVoid) {
 			printf("error: return type mismatch\n");
-			activeFunctionType = -1;
 		}
+		activeFunctionType = -1;
 		
 	}
 	;

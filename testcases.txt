@@ -11,30 +11,7 @@ int week = 0;
 
 void main() {    
 
-    for(int i=0; i<5; i=i+1)
-        int z;
-
-    enum week {SATURDAY=0, SUNDAY=1};
-
-    week x = SUNDAY;
-
-    while(x > 0) {
-        continue;
-        break;
-    }
-
-    do {
-        continue;
-        break;
-    }while(x > 0);
-
-    for(int i=0; i<x; i=i+1) {
-        continue;
-        break;
-    }
-
-    continue;
-    break;
+    return;
     
 }
 
