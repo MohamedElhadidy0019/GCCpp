@@ -14,6 +14,23 @@ void main() {
 
     week x = SUNDAY;
 
+    while(x > 0) {
+        continue;
+        break;
+    }
+
+    do {
+        continue;
+        break;
+    }while(x > 0);
+
+    for(int i=0; i<x; i=i+1) {
+        continue;
+        break;
+    }
+
+    continue;
+    break;
     
 }
 

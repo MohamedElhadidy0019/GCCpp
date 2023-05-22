@@ -159,7 +159,15 @@ block_statement : declaration ';'
         | print_statement ';'
 		| assignment ';'
         | CONTINUE ';'
+		{
+			if(loop == 0)
+				printf("error: continue statement not in a loop\n");
+		}
 		| BREAK ';'
+		{
+			if(loop == 0)
+				printf("error: break statement not in a loop\n");
+		}
         ;
 
 block : '{' {scope++;} block_statements '}' {removeCurrentScope(); scope--;}  
@@ -364,7 +372,7 @@ data_type: INT { $$ = typeInteger; }
 	;
 
 
-while_statement: while_declaraction  block 
+while_statement: while_declaraction {loop=1;} block {loop = 0;}
 	;
 
 while_declaraction : WHILE 	{
@@ -383,7 +391,7 @@ argument_print: argument_print ',' expression
 			;
 
 
-for_statement: for_declaration block 
+for_statement: for_declaration {loop=1;} block {loop=0;}
 	{
 		if(activeFunctionType == -1)
 			printf("error: for statement not in a function\n");	
@@ -395,7 +403,7 @@ for_declaration: FOR '(' {scope++; loop=1;} variable_declaration  ';' logical_ex
 		| FOR '(' assignment  ';' logical_expression  ';' assignment ')'
 	;
 
-do_while_statement : DO  block while_declaraction
+do_while_statement : DO {loop = 1;} block {loop=0;} while_declaraction
 			;
 
 switch_statement : SWITCH '('expression')'
