@@ -10,6 +10,7 @@ typedef struct valueNodes
 {
     int type;
     int kind;
+    char* enumName;
     union
     {
         int integer;
@@ -20,6 +21,16 @@ typedef struct valueNodes
     };
 } valueNode;
 
+typedef struct EnumNode {
+    char* name;
+    int value;
+} EnumNode;
+
+typedef struct EnumList {
+    char* names[10];
+    int values[10];
+    int nvals;
+} EnumList;
 
 typedef struct Args {
     int types[10];

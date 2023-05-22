@@ -3,14 +3,17 @@ int add(int x, int y) {
     return x + y;
 }
 
+int week = 0;
+
 void main() {    
 
     for(int i=0; i<5; i=i+1)
         int z;
 
-    int z = add(1, x);
+    enum week {SATURDAY=0, SUNDAY=1};
 
-    enum x {y, z, t};
-    x val = z;
+    week x = SUNDAY;
+
+    
 }
 

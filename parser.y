@@ -17,10 +17,12 @@ int yyparse();
 #define typeBoolean 3
 #define typeCharchter 4
 #define typeString 5
+#define enumType 6
 
 #define identifierKind 1
 #define constantKind 2
 #define functionKind 3
+#define enumKind 4
 
 #define valueMismatch 1
 #define constValueMismatch 2
@@ -63,6 +65,11 @@ int functionInTable(char* name, Args* args);
 void addFunctionToSymbolTable(char* name, int type, int kind, Args* args);
 int getActiveFunctionType();
 int getFunctionType(int index);
+int checkRepeatNames(EnumList* list, char* name);
+int checkEnumIsActive(char* name);	
+int checkEnumActiveGlobal(char* name);
+valueNode* getEnumValue(char* item, char* enum_name, int index);
+valueNode* getEnumValueGlobal(char* item, char* enum_name);
 //----------------------------------------------
 struct STNode symbol_table[10000];
 
@@ -84,6 +91,8 @@ int loop = 0;
     char* identifier;
 	struct valueNodes* valueNode;
 	struct Args* fnArgs;
+	struct EnumNode* enum_Node;
+	struct EnumList* enum_List;
 }
 
 /* Define token types */
@@ -122,6 +131,8 @@ int loop = 0;
 %type <integer_value> data_type argument
 %type <valueNode> value expression math_expression logical_expression term factor function_call
 %type <fnArgs> arguments argument_call
+%type <enum_Node> enum_item
+%type <enum_List> enum_list
 
 /* Define grammar rules */
 %start program
@@ -135,6 +146,7 @@ block_statements : block_statement
 		  | block_statements block_statement
 
 block_statement : declaration ';'
+		| enum_usage ';'
         | expression ';'		
 		| do_while_statement ';'   
 		| if_condition block              %prec IFX
@@ -194,20 +206,99 @@ variable_declaration: data_type IDENTIFIER
 	{
 		if(inTable((char*)$3) != -1)
 			printf("error: Constant %s has been declared before\n", (char*)$3);
-		else if ($5 != NULL && checkType($2,$5,valueMismatch) != -1); 
-			addToSymbolTable((char*)($3),$2,constantKind, $5);
+		else if ($5 != NULL && checkType($2,$5,valueMismatch) != -1) { 
+			valueNode* p = $5;
+			p->enumName = NULL;
+			addToSymbolTable((char*)($3),$2,constantKind, p);
+		}
+	}
+	;
+
+
+
+enum_usage: IDENTIFIER IDENTIFIER '=' IDENTIFIER
+	{	
+		int index = checkEnumIsActive((char*)$1); 
+		if(index == -1) {
+			printf("error: There is no Enum with name (%s)\n", (char*)$1);
+		}
+		else {
+			if(inTable((char*)$2) != -1)
+				printf("error: This identifier (%s) has been declared before\n", (char*)$2);
+			else {
+				valueNode* p = getEnumValue((char*)$4, $1, index);
+				if(p == NULL)
+					printf("error: Enum item (%s) has not been declared before in Enum (%s)\n", (char*)$4, (char*)$1);
+				else {
+					valueNode* q = (valueNode*)malloc(sizeof(valueNode));
+					q->type = p->type;
+					q->integer = p->integer;
+					q->enumName = (char*)$1;
+					addToSymbolTable((char*)($2),typeInteger,constantKind, q);
+				}
+			}
+		}
 	}
 	;
 
 enum_declaration: ENUM IDENTIFIER '{' enum_list '}'
+	{
+		if(inTable((char*)$2) != -1)
+			printf("error: Enum name (%s) has been declared before\n", (char*)$2);
+		else {
+			valueNode* p = (valueNode*)malloc(sizeof(valueNode));
+			p->type = enumType;
+			p->kind = enumKind;
+			addToSymbolTable((char*)($2),enumType,enumKind, p);
+			// add each name in the list to the symbol table as constants
+			EnumList* list = $4;
+			int i;
+			for(i = 0; i < list->nvals; i++) {
+				if(inTable(list->names[i]) != -1)
+					printf("error: Enum item (%s) has been declared before\n", list->names[i]);
+				else {
+					valueNode* p = (valueNode*)malloc(sizeof(valueNode));
+					p->type = typeInteger;
+					p->kind = constantKind;
+					p->enumName = $2;
+					p->integer = list->values[i];
+					addToSymbolTable(list->names[i],typeInteger,constantKind, p);
+				}
+			}
+		}
+	}
     ;
 
 enum_list: enum_item
-    | enum_list ',' enum_item
+	{
+		EnumList* list = (EnumList*)malloc(sizeof(EnumList));
+		list->nvals = 1;
+		list->names[0] = $1->name;
+		list->values[0] = $1->value;
+		$$ = list;
+	}
+	| enum_list ',' enum_item
+	{
+		EnumList* list = $1;
+		EnumNode* node = $3;
+		if(checkRepeatNames(list, node->name) == 1)
+			printf("error: Enum item (%s) has been declared before\n", node->name);
+		else {
+			list->nvals++;
+			list->names[list->nvals-1] = node->name;
+			list->values[list->nvals-1] = node->value;
+		}
+		$$ = list;
+	}
     ;
 
 enum_item: IDENTIFIER '=' INTEGER_TYPE
-    | IDENTIFIER
+	{	
+		EnumNode* node = (EnumNode*)malloc(sizeof(EnumNode));
+		node->name = $1;
+		node->value = $3;
+		$$ = node;
+	}
     ;
 
 assignment : IDENTIFIER '=' expression  
@@ -442,7 +533,6 @@ void yyerror(char *s) {
 valueNode* setValueNode(int type, void* value){
 	valueNode* p = (valueNode*)malloc(sizeof(valueNode));
 	p->type = type;
-	//p->kind = constantKind;
 	if (type == typeInteger)
 		p->integer = *((int *)value);
 	else if (type == typeFloat)
@@ -457,6 +547,50 @@ valueNode* setValueNode(int type, void* value){
 }
 
 
+int checkRepeatNames(EnumList* list, char* name){
+	for(int i=0; i<list->nvals; i++){
+		if (!strcmp(list->names[i],name))
+			return 1;
+	}
+	return 0;
+}
+
+int checkEnumIsActive(char* name){
+	for(int i=0; i<idx; i++) {
+		if (!strcmp(symbol_table[i].name,name) && symbol_table[i].kind == enumKind && symbol_table[i].scope == scope && symbol_table[i].isUsed == 1)
+			return i;
+	}
+ 
+	return checkEnumActiveGlobal(name);
+}
+
+valueNode* getEnumValueGlobal(char* item, char* enum_name) {
+	for(int i=0; i<idx; i++) {
+		if (!strcmp(symbol_table[i].name,item) && symbol_table[i].kind == constantKind && !strcmp(symbol_table[i].value->enumName, enum_name) && symbol_table[i].scope < scope) {
+			return symbol_table[i].value;
+		}
+	}
+
+	return NULL;
+}
+
+valueNode* getEnumValue(char* item, char* enum_name, int index) {
+	for(int i=0; i<idx; i++) {
+		if (!strcmp(symbol_table[i].name,item) && symbol_table[i].kind == constantKind && !strcmp(symbol_table[i].value->enumName, enum_name) && symbol_table[i].scope == symbol_table[index].scope) {
+			return symbol_table[i].value;
+		}
+	}
+	return getEnumValueGlobal(item, enum_name);
+}
+
+int checkEnumActiveGlobal(char* name){
+	for(int i=0; i<idx; i++) {
+		if (!strcmp(symbol_table[i].name,name) && symbol_table[i].kind == enumKind && symbol_table[i].scope < scope && symbol_table[i].isUsed == 1)
+			return i;
+	}
+
+	return -1;
+}
 // this function checks that all the args are of the same type as another args types
 // 0 means that the 2 args are not the same
 // 1 means that the 2 args are the same
@@ -480,7 +614,7 @@ int functionInTable(char* name, Args* args){
 		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0 && symbol_table[i].kind == functionKind && checkArgs(args, symbol_table[i].args) == 1) {
 			return i;  
 		}
-		else if(!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0 && (symbol_table[i].kind == identifierKind || symbol_table[i].kind == constantKind)) {
+		else if(!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == 0 && (symbol_table[i].kind == identifierKind || symbol_table[i].kind == constantKind || symbol_table[i].kind == enumKind)) {
 			return i;
 		}
 	return -1;
@@ -537,7 +671,8 @@ void addToSymbolTable(char* name , int type, int kind, valueNode* value) {
 	printSymbolTableCSV();
 } 
 
-
+// this function is only used to check for declaration of variables
+// so it only checks that the scopes are the same and the variable is used
 int inTable(char* name){
 	for (int i =0;i < idx;i++)
 		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope == scope  && symbol_table[i].isUsed == 1)
@@ -798,7 +933,7 @@ valueNode* getIDValue(char* name) {
 		// the variable is not in the current scope but it may be in the global scope
 		index = inTableGlobal(name);
 		if (index == -1) {
-			printf("variable %s not declared\n", name);
+			printf("Identifier (%s) not declared\n", name);
 			return NULL;
 		}
 		else {
