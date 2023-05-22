@@ -1,2 +1,11 @@
 
+int x = 0;
 
+enum week {SUNDAY = 0};
+
+void main() {
+
+    enum week{SUNDAY = 0};
+
+    return;
+}

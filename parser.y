@@ -1016,7 +1016,7 @@ void removeCurrentScope() {
 	for (i = 0; i < idx; i++) {
 		if (symbol_table[i].scope == scope) {
 			symbol_table[i].isUsed = 0;
-			symbol_table[i].value = NULL;
+			//symbol_table[i].value = NULL;
 		}
 	}
 }
@@ -1033,7 +1033,7 @@ void printSymbolTableCSV() {
 	//update++;
 	//fprintf(logFile, "%d,", update);
 	// print the fields names
-	fprintf(logFile, "name, scope, type, kind, nargs, argsTypes\n");
+	fprintf(logFile, "name, scope, type, kind, nargs, argsTypes, enum\n");
 	int i;
 	for (i = 0; i < idx; i++) {
 		// print each entry in the symbol table as a comma separated values regardelss of the value
@@ -1043,10 +1043,14 @@ void printSymbolTableCSV() {
 			for (int j = 0; j < symbol_table[i].args->nargs; j++) {
 				fprintf(logFile, "%d, ", symbol_table[i].args->types[j]);
 			}
-			fprintf(logFile, "]\n");
+			fprintf(logFile, "], ");
+			fprintf(logFile, "NA\n");
+		}
+		else if(symbol_table[i].kind == constantKind && symbol_table[i].value != NULL && symbol_table[i].value->enumName != NULL) {
+			fprintf(logFile, "%s, %d, %d, %d, NA, NA, %s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].value->enumName);
 		}
 		else {
-			fprintf(logFile, "%s, %d, %d, %d, NA, NA\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
+			fprintf(logFile, "%s, %d, %d, %d, NA, NA, NA\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
 		}
 
 	}
