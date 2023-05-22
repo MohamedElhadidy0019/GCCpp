@@ -35,6 +35,8 @@ int yyparse();
 #define funArgMismatch 8
 
 
+char* typesMap[] = {"void", "int", "float", "boolean", "char", "string", "enum"};
+
 int getType( int i);
 int getKind( int i);
 
@@ -55,11 +57,10 @@ void subtractOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void multiplyOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void divideOperation(valueNode* p, valueNode* val1, valueNode* val2);
 void modOperation(valueNode* p, valueNode* val1, valueNode* val2);
-valueNode* getIDValue(char* name);
 void printSymbolTable();
 void printSymbolTableCSV();
 void removeCurrentScope();
-void updateSymbolTable(char* name, valueNode* value);
+void updateSymbolTable(char* name, valueNode* value, int cast);
 valueNode* getIDValue(char* name);
 int checkArgs(Args* args1, Args* args2);
 int functionInTable(char* name, Args* args);
@@ -71,6 +72,7 @@ int checkEnumIsActive(char* name);
 int checkEnumActiveGlobal(char* name);
 valueNode* getEnumValue(char* item, char* enum_name, int index);
 valueNode* getEnumValueGlobal(char* item, char* enum_name);
+int checkPossibleCast(int type1, int type2);
 //----------------------------------------------
 struct STNode symbol_table[10000];
 
@@ -185,7 +187,14 @@ return_statement : RETURN expression
 		if(activeFunctionType == -1)
 			printf("error: return statement not in a function near line %d\n", yylineno);
 		else {
-			checkType(activeFunctionType, $2, returnMismatch);
+			int match = checkType(activeFunctionType, $2, returnMismatch);
+			if(match == -1) {
+				if (checkPossibleCast($2->type, activeFunctionType) == 1) {
+					printf("warning: implict casting from %s to %s near line %d\n", typesMap[$2->type], typesMap[activeFunctionType], yylineno);
+				}
+				else
+					printf("error: can't cast from %s to %s near line %d\n", typesMap[$2->type], typesMap[activeFunctionType], yylineno);
+			}
 		}
 		activeFunctionType = -1;
 	}	
@@ -193,9 +202,9 @@ return_statement : RETURN expression
 	{
 		if(activeFunctionType == -1)
 			printf("error: return statement not in a function near line %d\n", yylineno);
-		else if(activeFunctionType != typeVoid) {
+		else if(activeFunctionType != typeVoid) 
 			printf("error: return type mismatch near line %d\n", yylineno);
-		}
+		
 		activeFunctionType = -1;
 		
 	}
@@ -217,8 +226,20 @@ variable_declaration: data_type IDENTIFIER
 	{
 		if(inTable((char*)$2) != -1)
 			printf("error: Variable %s at line %d has been declared before\n", (char*)$2, yylineno);
-		else if ($4 != NULL && checkType($1,$4,valueMismatch) != -1); 
+		else if ($4 != NULL && checkType($1,$4,valueMismatch) != -1) {
 			addToSymbolTable((char*)($2),$1,identifierKind, $4);
+		}
+		else if ($4 != NULL && checkType($1,$4,valueMismatch) == -1) {
+			if (checkPossibleCast($4->type, $1) == 1) {
+				printf("warning: implict casting from %s to %s near line %d\n", typesMap[$4->type], typesMap[$1], yylineno);
+				valueNode* p = (valueNode*)malloc(sizeof(valueNode));
+				p->type = $1;
+				addToSymbolTable((char*)($2),$1,identifierKind, p);
+			}
+			else
+				printf("error: can't cast from %s to %s near line %d\n", typesMap[$4->type], typesMap[$1], yylineno);
+		}
+
 	}
 	| CONSTANT data_type IDENTIFIER '=' expression      
 	{
@@ -228,6 +249,17 @@ variable_declaration: data_type IDENTIFIER
 			valueNode* p = $5;
 			p->enumName = NULL;
 			addToSymbolTable((char*)($3),$2,constantKind, p);
+		}
+		else if ($5 != NULL && checkType($2,$5,valueMismatch) == -1) {
+			if (checkPossibleCast($5->type, $2) == 1) {
+				printf("warning: implict casting from %s to %s near line %d\n", typesMap[$5->type], typesMap[$2], yylineno);
+				valueNode* p = (valueNode*)malloc(sizeof(valueNode));
+				p->type = $2;
+				p->enumName = NULL;
+				addToSymbolTable((char*)($3),$2,constantKind, p);
+			}
+			else
+				printf("error: can't cast from %s to %s near line %d\n", typesMap[$5->type], typesMap[$2], yylineno);
 		}
 	}
 	;
@@ -321,8 +353,24 @@ enum_item: IDENTIFIER '=' INTEGER_TYPE
 
 assignment : IDENTIFIER '=' expression  
 	{
-		if(loop == 0)
-			updateSymbolTable($1,$3);
+		if(loop == 0) {
+			if(inTable($1) == -1)
+				printf("error: Variable %s at line %d has not been declared before\n", $1, yylineno);
+			else {
+				int type = getIDValue($1)->type;
+				int match = checkType(type, $3, valueMismatch);
+				if($3 != NULL && match == -1) {
+					if (checkPossibleCast($3->type, type) == 1) {
+						printf("warning: implict casting from %s to %s near line %d\n", typesMap[$3->type], typesMap[type], yylineno);
+						updateSymbolTable($1,$3, 1);
+					}
+					else
+						printf("error: can't cast from %s to %s near line %d\n", typesMap[$3->type], typesMap[type], yylineno);
+				}
+				else if($3 != NULL && match != -1)
+					updateSymbolTable($1,$3, 0);  
+			}
+		}
 		else {
 			if(inTable($1) == -1)
 				printf("error: Variable %s at line %d has not been declared before\n", $1, yylineno);
@@ -433,7 +481,7 @@ switch_statement : SWITCH '('expression')'
 case_statement : CASE value ':' 
 		{
 			if(switchType == -1) 
-				printf("error: case statement near line %d not in a switch statement\n", yylineno);
+				printf("error: case statement near line %d not in a switch statement or there is an error in switch variable\n", yylineno);
 			else {
 				checkType(switchType, $2, caseMismatch);
 			}
@@ -716,7 +764,7 @@ int inTable(char* name){
 
 int inTableGlobal(char* name){
 	for (int i =0;i < idx;i++)
-		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope < scope  && symbol_table[i].isUsed == 1)
+		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope < scope  && symbol_table[i].isUsed == 1 && symbol_table[i].kind != functionKind && symbol_table[i].kind != enumKind)
 			return i;  
 	return -1;
 }
@@ -725,25 +773,25 @@ int checkType(int x , valueNode* y , int errorType){
 	if (y != NULL && x != y->type){
 		switch (errorType){
 			case valueMismatch:
-				printf("variable/constant at line %d mismatches with the assigned value ", yylineno); 
+				printf("variable/constant at line %d mismatches with the assigned value\n", yylineno); 
 				break; 
 			case ifCondBoolErr:
-				printf("if condition near line %d must be of type boolean ", yylineno);  
+				printf("if condition near line %d must be of type boolean\n", yylineno);  
 				break;
 			case whileCondBoolErr:
-				printf("while condition near line %d must be of type boolean ", yylineno);  
+				printf("while condition near line %d must be of type boolean\n", yylineno);  
 				break;
 			case forCondBoolErr:
-				printf("for condition near line %d must be of type boolean ", yylineno);  
+				printf("for condition near line %d must be of type boolean\n", yylineno);  
 				break;
 			case caseMismatch:
-				printf("case variable near line %d type must be same as switch variable type ", yylineno);  
+				printf("case variable near line %d type must be same as switch variable type\n", yylineno);  
 				break;
 			case returnMismatch:
-				printf("return type at line %d must be the same as function type ", yylineno);  
+				printf("return type at line %d must be the same as function type\n", yylineno);  
 				break;
 			case funArgMismatch:
-				printf("function argument value near line %d must be the same as function argument type ", yylineno); 
+				printf("function argument value near line %d must be the same as function argument type\n", yylineno); 
 				break;
 		}
 		return -1;
@@ -990,7 +1038,43 @@ int getActiveFunctionType() {
 	return -1;
 }
 
-void updateSymbolTable(char* name, valueNode* value) {
+// this function checks if there possible cast from type1 to type2
+int checkPossibleCast(int type1, int type2) {
+	if (type1 == typeInteger) {
+		if (type2 == typeFloat || type2 == typeBoolean || type2 == typeCharchter) {
+			return 1;
+		}
+		else
+			return 0;
+	}
+	else if (type1 == typeFloat) {
+		if (type2 == typeInteger || type2 == typeBoolean || type2 == typeCharchter) {
+			return 1;
+		}
+		else
+			return 0;
+	}
+	else if (type1 == typeBoolean) {
+		if (type2 == typeInteger || type2 == typeFloat || type2 == typeCharchter) {
+			return 1;
+		}
+		else
+			return 0;
+	}
+	else if (type1 == typeCharchter) {
+		if (type2 == typeInteger || type2 == typeFloat || type2 == typeBoolean) {
+			return 1;
+		}
+		else
+			return 0;
+	}
+	else if (type1 == typeString) 
+		return 0;
+	else 
+		return 0;
+}
+
+void updateSymbolTable(char* name, valueNode* value, int cast) {
 	// check that the variable is in the symbol table in the global scope (scope = 0)
 	int index = inTable(name);
 	if (index == -1) {
@@ -1003,7 +1087,11 @@ void updateSymbolTable(char* name, valueNode* value) {
 	}
 
 	// update the value of the variable
-	symbol_table[index].value = value;
+	if(!cast && value != NULL && symbol_table[index].kind != constantKind)
+		symbol_table[index].value->type = value->type;
+	else if (!cast && value != NULL && symbol_table[index].kind == constantKind)
+		printf("Error: cannot assign value to constant variable (%s) at line %d\n", name, yylineno);
+
 	
 	// print the symbol table as CSV
 	printSymbolTableCSV();	

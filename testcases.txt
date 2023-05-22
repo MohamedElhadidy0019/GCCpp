@@ -1,11 +1,4 @@
 
-int x = 0;
+const int x = 5;
 
-enum week {SUNDAY = 0};
-
-void main() {
-
-    enum week{SUNDAY = 0};
-
-    return;
-}
+x = 5;
