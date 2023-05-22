@@ -603,7 +603,7 @@ int checkEnumActiveGlobal(char* name){
 // 0 means that the 2 args are not the same
 // 1 means that the 2 args are the same
 int checkArgs(Args* args1, Args* args2){
-	if (args1->nargs != args2->nargs) {
+	if (args1->nargs == args2->nargs) {
 		for(int i=0; i<args1->nargs; i++){
 			if (args1->types[i] != args2->types[i])
 				return 0;

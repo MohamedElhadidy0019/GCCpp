@@ -3,6 +3,10 @@ int add(int x, int y) {
     return x + y;
 }
 
+int add(int x) {
+    return x;
+}
+
 int week = 0;
 
 void main() {    
