@@ -183,15 +183,20 @@ return_statement : RETURN expression
 	{
 		if(activeFunctionType == -1)
 			printf("error: return statement not in a function\n");
-		else
+		else {
 			checkType(activeFunctionType, $2, returnMismatch);
+			activeFunctionType = -1;
+		}
 	}	
 	| RETURN 
 	{
 		if(activeFunctionType == -1)
 			printf("error: return statement not in a function\n");
-		else if(activeFunctionType != typeVoid)
+		else if(activeFunctionType != typeVoid) {
 			printf("error: return type mismatch\n");
+			activeFunctionType = -1;
+		}
+		
 	}
 	;
 
@@ -475,8 +480,20 @@ argument : data_type IDENTIFIER
 	}
 	;
 	
-function : VOID IDENTIFIER  '(' {activeFunctionType = typeVoid;} arguments')'  functionBlock  {activeFunctionType = -1; addFunctionToSymbolTable($2,typeVoid,functionKind, $5);}
-	|  data_type IDENTIFIER  '(' {activeFunctionType = $1;} arguments')'  functionBlock  {activeFunctionType = -1; addFunctionToSymbolTable($2,$1,functionKind, $5);}
+function : VOID IDENTIFIER  '(' {activeFunctionType = typeVoid;} arguments')'  functionBlock
+	{
+		if(activeFunctionType != -1) {
+			printf("error: function %s() doesn't have return statement\n", (char*)$2);
+		}
+		addFunctionToSymbolTable($2,typeVoid,functionKind, $5);
+	}
+	|  data_type IDENTIFIER  '(' {activeFunctionType = $1;} arguments')'  functionBlock 
+	{
+		if(activeFunctionType != -1) {
+			printf("error: function %s() doesn't have return statement\n", (char*)$2);
+		}
+		addFunctionToSymbolTable($2,$1,functionKind, $5);
+	}
 	;
 
 function_call: IDENTIFIER '('argument_call')'  
