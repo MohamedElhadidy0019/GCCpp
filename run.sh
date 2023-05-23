@@ -10,4 +10,4 @@ flex lexer.l
 gcc parser.tab.c lex.yy.c
 
 # run the output file
-./a.out testcases.txt
+./a.out testcases.txt > error.txt

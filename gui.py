@@ -62,6 +62,7 @@ class Window(QWidget):
         # Create the QHBoxLayout for the code, quad, and error
         edit_layout = QHBoxLayout()
         edit_layout.addLayout(code_layout)
+
         edit_layout.addLayout(quad_layout)
         edit_layout.addLayout(error_layout)
         edit_layout.addLayout(symbol_layout)
@@ -74,6 +75,22 @@ class Window(QWidget):
 
         # Set the main layout for the window
         self.setLayout(main_layout)
+    # def replace_html_entities(self, text):
+    #     """
+    #     Replaces the '<' and '>' characters in a string with their corresponding HTML entities.
+    #     """
+    #     text = text.replace("<", "&lt;")
+    #     text = text.replace(">", "&gt;")
+    #     return text
+    def replace_html_entities(self, text):
+        """
+        Replaces the '<' and '>' characters in a string with their corresponding HTML entities,
+        """
+        text = text.replace("<", "&lt;")
+        text = text.replace(">", "&gt;")
+        text = text.replace(" ", "&nbsp;")
+        return text
+
 
     def syntax_highlight(self, error_list):
         text = self.code_edit.toPlainText()
@@ -81,10 +98,11 @@ class Window(QWidget):
         i=0
         for line in text.split('\n'):
             # make it html
+            print(line)
             if i in error_list:
-                line = "<font color='red'>" + line + "</font>"
+                line = "<font color='red'>" + self.replace_html_entities(line) + "</font>"
             else:
-                line = "<font color='black'>" + line + "</font>"
+                line = "<font color='black'>" + self.replace_html_entities(line) + "</font>"
             txt_temp += line + '<br>'
             i+=1
         self.code_edit.clear()
@@ -96,6 +114,7 @@ class Window(QWidget):
         lines = symbol_txt.split('\n')
         for line in lines:
             if not line.startswith('id'):
+                line = str(line).replace(" ", "")
                 lines_clean.append(line)
 
         # print("len of lines clean: ", len(lines_clean))
@@ -114,10 +133,6 @@ class Window(QWidget):
             i+=1
 
 
-        # print("len of string list: ", len(string_list) )
-        # for string in string_list:
-        #     print(string)
-            # print('yaaaaay')
 
         self.symbols_list = string_list
 
@@ -128,41 +143,59 @@ class Window(QWidget):
             self.symbol_edit.clear()
 
             # makse symbol and header equally spaced
-
+            # remove whitspace
+            symbol = str(symbol).replace(" ", "")
+            print(symbol)
             self.symbol_edit.setText(symbol)
         else:
             self.symbol_edit.setText("No more symbols :)")
 
 
-        pass
+
+    def error_lines (self, error_txt):
+
+        lines_list =[]
+
+
+        return lines_list
+
+
 
     def compile(self):
-
+        self.symbols_list = []
         # clear
         self.quad_edit.clear()
         self.error_edit.clear()
         self.symbol_edit.clear()
 
 
-        # Get the text from the code edit
         code = self.code_edit.toPlainText()
-        # dump it to a file
-        with open("code.txt", "w") as f:
+        with open("testcases.txt", "w") as f:
             f.write(code)
 
         # run the script
         current_dir = str(os.getcwd())
-        script_dir = current_dir + "/troll.sh"
+        script_dir = current_dir + "/run.sh"
         result = subprocess.run([script_dir])
 
-
-        with open("quad.txt", "r") as f:
-            quad = f.read()
-        self.quad_edit.append(quad)
 
         with open("error.txt", "r") as f:
             error = f.read()
         self.error_edit.append(error)
+
+        if error != "":
+            error_list = self.error_lines(error)
+            error_list = [0,2]
+            self.syntax_highlight(error_list)
+            self.quad_edit.setText("Error in code")
+            self.symbol_edit.setText("Error in code")
+            return
+
+
+        with open("quad_log.log", "r") as f:
+            quad = f.read()
+        self.quad_edit.append(quad)
+
 
         with open("symbol_table.log", "r") as f:
             symbol_txt = f.read()
@@ -171,8 +204,7 @@ class Window(QWidget):
 
 
         # TODO take number of errors from error.txt
-        error_list = [0,3,5]
-        self.syntax_highlight(error_list)
+
 
 
 if __name__ == "__main__":
