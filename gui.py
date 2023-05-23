@@ -26,6 +26,7 @@ class Window(QWidget):
         self.quad_label = QLabel("Quadruples")
         self.error_label = QLabel("Error/Syntax")
         self.symbol_label = QLabel("Symbol Table")
+        self.symbol_label = QLabel("id,name,scope,type,kind,nargs,argsTypes,enum")
 
         # make it read only
         self.quad_edit.setReadOnly(True)
