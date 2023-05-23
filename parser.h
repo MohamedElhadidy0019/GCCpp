@@ -51,3 +51,9 @@ struct STNode
     valueNode *value;
     struct Args *args;
 };
+
+struct functionStruct{
+    char name[100];
+    int args;
+    int label;
+};

@@ -45,6 +45,8 @@ int checkKind (int kind);
 void setUsed(int i);
 
 /*my functions*/
+void addFunctionStruct(char* name, int arges, int label);
+int getFunctionLabel(char* name, int arges);
 void printQuadLogInt(int);
 void printQuadLog(char*);
 char* getVariableID(char*);
@@ -91,6 +93,10 @@ int labelsId = 100;
 int isDoWhile = 0;
 int forLoopAssignment = 0;
 char forLoopAssignmentStr[100];
+int functionDeclaration = 0;
+char functionDeclarationArguments[100];
+struct functionStruct functionStructs[100];
+int functionStructsIdx = 0;
 %}
 
 /* Define yylval union */
@@ -579,6 +585,9 @@ argument : data_type IDENTIFIER
 			printf("error: Variable %s at line %d has been declared before\n", (char*)$2, yylineno);
 		else {
 			addToSymbolTable((char*)$2,$1,functionKind, NULL);
+			printQuadLog("POPI ");
+			printQuadLog($2);
+			printQuadLog("\n");
 			$$ = $1;
 		}
 	}
@@ -596,24 +605,69 @@ argument : data_type IDENTIFIER
 	}
 	;
 	
-function : VOID IDENTIFIER  '(' {activeFunctionType = typeVoid;} arguments')'  functionBlock
+function : 	
+		VOID 
+		IDENTIFIER  
+		'(' 
+		{activeFunctionType = typeVoid; functionDeclaration = 1;} 
+		arguments
+
+		{ 
+			functionDeclaration = 0;
+			printQuadLog("\n\nPROC "); 
+			printQuadLog($2);
+			printQuadLog("_");
+			addFunctionStruct((char*)$2, $5->nargs, labelsId);
+			printQuadLogInt(labelsId); 
+			printQuadLog(":\n");
+			labelsId = labelsId + 10;
+			printQuadLog(functionDeclarationArguments);
+			functionDeclarationArguments[0] = '\0';
+		} 
+
+		')'  
+		functionBlock
 	{
 		if(activeFunctionType != -1) {
 			printf("error: function %s() near line %d doesn't have return statement\n", (char*)$2, yylineno);
 		}
 		addFunctionToSymbolTable($2,typeVoid,functionKind, $5);
 	}
-	|  data_type IDENTIFIER  '(' {activeFunctionType = $1;} arguments')'  functionBlock 
-	{
-		if(activeFunctionType != -1) {
-			printf("error: function %s() near line %d doesn't have return statement\n", (char*)$2, yylineno);
+	|  
+		data_type 
+		IDENTIFIER  
+		'(' 
+		{activeFunctionType = $1; functionDeclaration = 1;} 
+		arguments
+		{ 
+			functionDeclaration = 0;
+			printQuadLog("\n\nPROC "); 
+			printQuadLog($2);
+			printQuadLog("_");
+			addFunctionStruct((char*)$2, $5->nargs, labelsId);
+			printQuadLogInt(labelsId); 
+			printQuadLog(":\n");
+			labelsId = labelsId + 10;
+			printQuadLog(functionDeclarationArguments);
+			functionDeclarationArguments[0] = '\0';
+		} 
+		')'  
+		functionBlock 
+		{
+			if(activeFunctionType != -1) {
+				printf("error: function %s() near line %d doesn't have return statement\n", (char*)$2, yylineno);
+			}
+			addFunctionToSymbolTable($2,$1,functionKind, $5);
 		}
-		addFunctionToSymbolTable($2,$1,functionKind, $5);
-	}
 	;
 
 function_call: IDENTIFIER '('argument_call')'  
 	{
+		printQuadLog("CALL ");
+		printQuadLog($1);
+		printQuadLog("_");
+		printQuadLogInt(getFunctionLabel($1,$3->nargs));
+		printQuadLog("\n");
 		int index = functionInTable((char*)$1, $3);
 		if(index == -1)
 			printf("error: function %s near line %d has not been declared before\n", (char*)$1, yylineno);
@@ -707,6 +761,10 @@ void printQuadLog(char* str){
 		strcat(forLoopAssignmentStr,str);
 		return;
 	}
+	if(functionDeclaration == 1){
+		strcat(functionDeclarationArguments,str);
+		return; 
+	}
 	fprintf(quadFile, "%s",str);
 }
 
@@ -732,6 +790,22 @@ void quadLogValue(int type, void* value){
 	printQuadLog("\n");
 }
 
+void addFunctionStruct(char* name, int arges, int label){
+	struct functionStruct fnStrct;
+	strcpy(fnStrct.name,name);
+	fnStrct.args = arges;
+	fnStrct.label = label;
+	functionStructs[functionStructsIdx] = fnStrct;
+	functionStructsIdx = functionStructsIdx + 1;
+}
+
+int getFunctionLabel(char* name, int arges){
+	for(int i = 0 ; i < functionStructsIdx; i++){
+		if(!strcmp(functionStructs[i].name,name) && arges == functionStructs[i].args)
+			return functionStructs[i].label;
+	}
+	return -1;
+}
 valueNode* setValueNode(int type, void* value){
 	valueNode* p = (valueNode*)malloc(sizeof(valueNode));
 	p->type = type;

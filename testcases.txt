@@ -1,10 +1,11 @@
+
+int x(int y){return 0;}
+int x(int ytt, int zz){return 0;}
+
 int main(){
 
-    int x= 1;
-    int y = 2;
-    for(int i = 0 ; i< 5 ; i = i + 1 ){
-        i = 5;
-        int tt = 6;
-    }
-    return 10;
+    int zz = 6666;
+    return 99;
+    x(4);
+    x(5,7);
 }
