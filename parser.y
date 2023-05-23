@@ -310,7 +310,7 @@ enum_usage: IDENTIFIER IDENTIFIER '=' IDENTIFIER
 					q->integer = p->integer;
 					q->enumName = (char*)$1;
 				
-					printQuadLog("PUSH ");
+					printQuadLog("PUSHI ");
 					printQuadLog(getVariableID($4));
 					printQuadLog("\n");
 
@@ -450,7 +450,7 @@ value: INTEGER_TYPE  { $$ = setValueNode(typeInteger, &$1); }
 	| FLOAT_TYPE     { $$ = setValueNode(typeFloat, &$1); }
 	| BOOLEAN_TYPE   { $$ = setValueNode(typeBoolean, &$1); }
 	| CHARACTER_TYPE { $$ = setValueNode(typeCharchter, &$1); }
-	| STRING_TYPE    { printQuadLog("PUSH "); printQuadLog($1); printQuadLog("\n"); $$ = setValueNode(typeString, &$1); }
+	| STRING_TYPE    { printQuadLog("PUSHI "); printQuadLog($1); printQuadLog("\n"); $$ = setValueNode(typeString, &$1); }
 	;
 
 data_type: INT { $$ = typeInteger; }

@@ -1,5 +1,7 @@
 int main(){
+
     int x = 10;
+    !(5>5);
     switch(x){
         case 5:{
             int yy = 77;
