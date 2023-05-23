@@ -97,6 +97,7 @@ int functionDeclaration = 0;
 char functionDeclarationArguments[100];
 struct functionStruct functionStructs[100];
 int functionStructsIdx = 0;
+int switchID = 1;
 %}
 
 /* Define yylval union */
@@ -220,6 +221,7 @@ return_statement : RETURN expression
 			}
 		}
 		activeFunctionType = -1;
+		printQuadLog("RET\n");
 	}	
 	| RETURN 
 	{
@@ -543,25 +545,47 @@ do_while_statement : DO
 					}
 			;
 
-switch_statement : SWITCH '('expression')'
+switch_statement : {switchID = switchID + 1;} SWITCH '('expression')'
 			{
 				if(activeFunctionType == -1)
 					printf("error: switch statement near line %d not in a function\n", yylineno);
-				if($3 != NULL)
-					switchType = $3->type;
+				if($4 != NULL)
+					switchType = $4->type;
 			} 
-			'{' case_statement '}' {switchType = -1;}
+			'{' case_statement '}' 
+			{
+				printQuadLog("END_CASE_");
+				printQuadLogInt(switchID);
+				printQuadLog(":\n");
+				switchType = -1;
+			}
 
 
 case_statement : CASE value ':' 
 		{
+			printQuadLog("XOR\n");
+			printQuadLog("JNZ CASE_");
+			printQuadLogInt(labelsId);
+			printQuadLog("\n");
 			if(switchType == -1) 
 				printf("error: case statement near line %d not in a switch statement or there is an error in switch variable\n", yylineno);
 			else {
 				checkType(switchType, $2, caseMismatch);
 			}
 			
-		} block case_statement 
+		} block 
+		{	
+			printQuadLog("JMP END_CASE_");
+			printQuadLogInt(switchID);
+			printQuadLog("\n");
+
+
+			printQuadLog("CASE_");
+			printQuadLogInt(labelsId);
+			labelsId = labelsId + 10;
+			printQuadLog(":\n");
+		}
+		case_statement 
 		| DEFAULT ':' block 
 		| %empty
 		;
