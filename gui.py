@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QPushButton,
 )
+
 class Window(QWidget):
     def __init__(self):
         super().__init__()
@@ -175,6 +176,8 @@ class Window(QWidget):
         # run the script
         current_dir = str(os.getcwd())
         script_dir = current_dir + "/run.sh"
+        if sys.platform == 'win32':
+            script_dir = current_dir + "/run.bat"
         result = subprocess.run([script_dir])
 
 
