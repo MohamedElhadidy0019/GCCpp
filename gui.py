@@ -126,6 +126,9 @@ class Window(QWidget):
         if len(self.symbols_list) > 0:
             symbol = self.symbols_list.pop(0)
             self.symbol_edit.clear()
+
+            # makse symbol and header equally spaced
+
             self.symbol_edit.setText(symbol)
         else:
             self.symbol_edit.setText("No more symbols :)")
