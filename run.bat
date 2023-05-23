@@ -1,4 +1,4 @@
 bison -d parser.y
 flex lexer.l
 gcc parser.tab.c lex.yy.c
-.\a.exe testcases.txt
+.\a.exe testcases.txt >> error.txt
