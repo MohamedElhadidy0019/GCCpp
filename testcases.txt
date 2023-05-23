@@ -1,15 +1,10 @@
 int main(){
 
-    int x = 1;
-    while(x > 10){
-        int y = 1111;
+    int x= 1;
+    int y = 2;
+    for(int i = 0 ; i< 5 ; i = i + 1 ){
+        i = 5;
+        int tt = 6;
     }
-
-
-    int zz = 999999;
-
-    do{
-        int ee = 8888;
-    } while(555555 > 22222);
-    return 99;
+    return 10;
 }

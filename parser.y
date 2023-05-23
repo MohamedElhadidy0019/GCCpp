@@ -89,6 +89,8 @@ int switchType = -1;
 int loop = 0;
 int labelsId = 100;
 int isDoWhile = 0;
+int forLoopAssignment = 0;
+char forLoopAssignmentStr[100];
 %}
 
 /* Define yylval union */
@@ -391,7 +393,7 @@ assignment : IDENTIFIER '=' expression
 				printf("error: Variable %s at line %d has not been declared before\n", $1, yylineno);
 			else {
 				int type = getIDValue($1)->type;
-				checkType(type, $3, valueMismatch);  
+				checkType(type, $3, valueMismatch);	  
 			}
 		}
 	}
@@ -485,17 +487,36 @@ argument_print: argument_print ',' expression
 			;
 
 
-for_statement: for_declaration {loop=1;} block {loop=0;}
+for_statement:  for_declaration 
+	block 
+	{
+		printQuadLog(forLoopAssignmentStr);
+		forLoopAssignmentStr[0] = '\0';
+		printQuadLog("JMP FOR_LOOP_BEGIN_"); printQuadLogInt(labelsId); printQuadLog("\n");
+		printQuadLog("END_FOR_LOOP_"); printQuadLogInt(labelsId); printQuadLog(":\n");
+		labelsId = labelsId + 10;
+	}
 	{
 		if(activeFunctionType == -1)
 			printf("error: for statement near line %d not in a function\n", yylineno);	
 	}
 	;
 
-for_declaration: FOR '(' {scope++; loop=1;} variable_declaration  ';' logical_expression  ';' assignment ')' {scope--; loop=0;}
+for_declaration: FOR '(' {scope++; loop=1;} variable_declaration  ';' for_condition  ';' for_increment ')' {scope--; loop=0;}
 
-		| FOR '(' assignment  ';' logical_expression  ';' assignment ')'
+		| FOR '(' assignment  ';' for_condition  ';' for_increment ')'
 	;
+
+for_condition: 
+	{printQuadLog("FOR_LOOP_BEGIN_"); printQuadLogInt(labelsId); printQuadLog(":\n");}
+	logical_expression
+	{printQuadLog("JZ END_FOR_LOOP_"); printQuadLogInt(labelsId); printQuadLog("\n");}
+
+
+
+for_increment: {forLoopAssignment=1;} 
+		assignment  
+		{forLoopAssignment=0;}
 
 do_while_statement : DO 
 					{
@@ -681,6 +702,10 @@ void printQuadLogInt(int val){
 void printQuadLog(char* str){
 	if(quadFile == NULL){
 		quadFile=fopen("quad_log.log","w");
+	}
+	if(forLoopAssignment == 1){
+		strcat(forLoopAssignmentStr,str);
+		return;
 	}
 	fprintf(quadFile, "%s",str);
 }
@@ -1234,7 +1259,7 @@ void updateSymbolTable(char* name, valueNode* value, int cast) {
 
 	
 	// print the symbol table as CSV
-	printSymbolTableCSV();	
+	printSymbolTableCSV();
 	printQuadLog("POPI ");
 	printQuadLog(getVariableID(name));
 	printQuadLog("\n");
@@ -1263,24 +1288,24 @@ void printSymbolTableCSV() {
 	//update++;
 	//fprintf(logFile, "%d,", update);
 	// print the fields names
-	fprintf(logFile, "id, name, scope, type, kind, nargs, argsTypes, enum\n");
+	fprintf(logFile, "id,\tname,\tscope,\ttype,\tkind,\tnargs,\targsTypes,\tenum\n");
 	int i;
 	for (i = 0; i < idx; i++) {
 		// print each entry in the symbol table as a comma separated values regardelss of the value
 		if(symbol_table[i].kind == functionKind) {
-			fprintf(logFile, "%d, %s, %d, %d, %d, %d, ", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].args->nargs);
-			fprintf(logFile, "[ ");
+			fprintf(logFile, "%d,\t%s,\t%d,\t\t%d,\t\t%d,\t\t%d,\t", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].args->nargs);
+			fprintf(logFile, "\t[ ");
 			for (int j = 0; j < symbol_table[i].args->nargs; j++) {
 				fprintf(logFile, "%d, ", symbol_table[i].args->types[j]);
 			}
 			fprintf(logFile, "], ");
-			fprintf(logFile, "NA\n");
+			fprintf(logFile, "\t\tNA\n");
 		}
 		else if(symbol_table[i].kind == constantKind && symbol_table[i].value != NULL && symbol_table[i].value->enumName != NULL) {
-			fprintf(logFile, "%d, %s, %d, %d, %d, NA, NA, %s\n", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].value->enumName);
+			fprintf(logFile, "%d,\t%s,\t\t%d,\t\t%d,\t\t%d,\t\tNA,\t\tNA,\t\t%s\n", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].value->enumName);
 		}
 		else {
-			fprintf(logFile, "%d, %s, %d, %d, %d, NA, NA, NA\n", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
+			fprintf(logFile, "%d,\t%s,\t\t%d,\t\t%d,\t\t%d,\t\tNA,\t\tNA,\t\t\tNA\n", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
 		}
 
 	}
