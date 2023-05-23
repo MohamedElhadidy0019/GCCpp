@@ -66,7 +66,7 @@ false                                       yylval.boolean_value=0; return BOOLE
 
 ['][a-zA-Z][']                              yylval.char_value=yytext[1]; return CHARACTER_TYPE;
 
-\"[^"]*\"                                   yylval.string_value=strdup(yytext+1); yylval.string_value[strlen(yytext)-1]='\0'; return STRING_TYPE;
+\"[^"]*\"                                   yylval.string_value=strdup(yytext+1); yylval.string_value[strlen(yytext)-2]='\0'; return STRING_TYPE;
 
 [a-zA-Z\_][0-9a-zA-Z\_]*                    yylval.identifier=strdup(yytext); return IDENTIFIER;
 

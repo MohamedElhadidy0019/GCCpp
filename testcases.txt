@@ -1,11 +1,10 @@
-
-int x(int y){return 0;}
-int x(int ytt, int zz){return 0;}
-
 int main(){
+    
 
-    int zz = 6666;
+
+    enum x {aa = 10, bb = 20, cc = 30};
+
+    x val = aa;
+
     return 99;
-    x(4);
-    x(5,7);
 }

@@ -146,7 +146,7 @@ int functionStructsIdx = 0;
 %precedence '(' ')' '{' '}'
 
 /*rules types*/ 
-%type <integer_value> data_type argument
+%type <integer_value> data_type argument argument_print
 %type <valueNode> value expression math_expression logical_expression term factor function_call
 %type <fnArgs> arguments argument_call
 %type <enum_Node> enum_item
@@ -307,6 +307,11 @@ enum_usage: IDENTIFIER IDENTIFIER '=' IDENTIFIER
 					q->type = p->type;
 					q->integer = p->integer;
 					q->enumName = (char*)$1;
+				
+					printQuadLog("PUSH ");
+					printQuadLog(getVariableID($4));
+					printQuadLog("\n");
+
 					addToSymbolTable((char*)($2),typeInteger,constantKind, q);
 				}
 			}
@@ -326,7 +331,7 @@ enum_declaration: ENUM IDENTIFIER '{' enum_list '}'
 			// add each name in the list to the symbol table as constants
 			EnumList* list = $4;
 			int i;
-			for(i = 0; i < list->nvals; i++) {
+			for(i = list->nvals-1; i >= 0; i--) {
 				if(inTable(list->names[i]) != -1)
 					printf("error: Enum item (%s) at line %d has been declared before\n", list->names[i], yylineno);
 				else {
@@ -367,6 +372,7 @@ enum_list: enum_item
 
 enum_item: IDENTIFIER '=' INTEGER_TYPE
 	{	
+		setValueNode(typeInteger, &$3);
 		EnumNode* node = (EnumNode*)malloc(sizeof(EnumNode));
 		node->name = $1;
 		node->value = $3;
@@ -442,7 +448,7 @@ value: INTEGER_TYPE  { $$ = setValueNode(typeInteger, &$1); }
 	| FLOAT_TYPE     { $$ = setValueNode(typeFloat, &$1); }
 	| BOOLEAN_TYPE   { $$ = setValueNode(typeBoolean, &$1); }
 	| CHARACTER_TYPE { $$ = setValueNode(typeCharchter, &$1); }
-	| STRING_TYPE    { $$ = setValueNode(typeString, &$1); }
+	| STRING_TYPE    { printQuadLog("PUSH "); printQuadLog($1); printQuadLog("\n"); $$ = setValueNode(typeString, &$1); }
 	;
 
 data_type: INT { $$ = typeInteger; }
@@ -482,14 +488,14 @@ while_declaraction :
 
   
 
-print_statement : PRINT '(' argument_print ')' 
+print_statement : PRINT '(' argument_print ')' {printQuadLog("PRINT "); printQuadLogInt($3); printQuadLog("\n");} 
 	{
 		if(activeFunctionType == -1)
 			printf("error: print statement near line %d not in a function\n", yylineno);
 	}
 	;
-argument_print: argument_print ',' expression
-			| expression
+argument_print: argument_print ',' expression {$$ = $1 + 1;}
+			| expression {$$ = 1;}
 			;
 
 
@@ -809,6 +815,7 @@ int getFunctionLabel(char* name, int arges){
 valueNode* setValueNode(int type, void* value){
 	valueNode* p = (valueNode*)malloc(sizeof(valueNode));
 	p->type = type;
+	int isString = 0;
 	if (type == typeInteger)
 		p->integer = *((int *)value);
 	else if (type == typeFloat)
@@ -817,10 +824,12 @@ valueNode* setValueNode(int type, void* value){
 		p->boolean = *((int *)value);
 	else if (type == typeCharchter)
 		p->character = *((char *)value);
-	else
+	else{
+		isString = 1;
 		p->name = (char*)value;
+	}
 	
-	quadLogValue(type,value);
+	if(!isString) quadLogValue(type,value);
 	return p;
 }
 
