@@ -1255,11 +1255,10 @@ valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) 
 		return NULL;
 	}
 	int type1 = par1->type;
-	int type2 = par2->type;
+	valueNode* p = (valueNode*)malloc(sizeof(valueNode));
+	p->type = typeBoolean;
 	// check if the two types are the same
-	if (checkType(type1, par2, valueMismatch) == type1){
-		valueNode* p = (valueNode*)malloc(sizeof(valueNode));
-		p->type = typeBoolean;
+	if (par2 != NULL && checkType(type1, par2, valueMismatch) == type1){
 		if(strcmp(operation, "&&") == 0) {
 			printQuadLog("AND\n");
 			//p->boolean = par1->boolean && par2->boolean;
@@ -1276,6 +1275,13 @@ valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) 
 			comparisonOperations(operation, par1, par2, p);
 		}
 		return p;
+	}
+	else if(par2 == NULL) {
+		if(strcmp(operation, "!") == 0) {
+			printQuadLog("NOT\n");
+			return p;
+		}
+		return NULL;
 	}
 	return NULL;
 }
