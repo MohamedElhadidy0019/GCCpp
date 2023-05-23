@@ -1,5 +1,6 @@
-import sys
 import subprocess
+import sys
+import re
 import os
 from PyQt5.QtWidgets import QApplication, QWidget, QTextEdit, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 import PyQt5
@@ -25,6 +26,7 @@ class Window(QWidget):
         self.quad_label = QLabel("Quadruples")
         self.error_label = QLabel("Error/Syntax")
         self.symbol_label = QLabel("Symbol Table")
+        self.symbol_label = QLabel("id,name,scope,type,kind,nargs,argsTypes,enum")
 
         # make it read only
         self.quad_edit.setReadOnly(True)
@@ -75,13 +77,8 @@ class Window(QWidget):
 
         # Set the main layout for the window
         self.setLayout(main_layout)
-    # def replace_html_entities(self, text):
-    #     """
-    #     Replaces the '<' and '>' characters in a string with their corresponding HTML entities.
-    #     """
-    #     text = text.replace("<", "&lt;")
-    #     text = text.replace(">", "&gt;")
-    #     return text
+
+
     def replace_html_entities(self, text):
         """
         Replaces the '<' and '>' characters in a string with their corresponding HTML entities,
@@ -98,7 +95,7 @@ class Window(QWidget):
         i=0
         for line in text.split('\n'):
             # make it html
-            print(line)
+            # print(line)
             if i in error_list:
                 line = "<font color='red'>" + self.replace_html_entities(line) + "</font>"
             else:
@@ -114,10 +111,8 @@ class Window(QWidget):
         lines = symbol_txt.split('\n')
         for line in lines:
             if not line.startswith('id'):
-                line = str(line).replace(" ", "")
                 lines_clean.append(line)
 
-        # print("len of lines clean: ", len(lines_clean))
 
         string_list = []
         i=0
@@ -142,22 +137,26 @@ class Window(QWidget):
             symbol = self.symbols_list.pop(0)
             self.symbol_edit.clear()
 
-            # makse symbol and header equally spaced
-            # remove whitspace
             symbol = str(symbol).replace(" ", "")
-            print(symbol)
+            symbol = str(symbol).replace("\t", "")
+            # print(symbol)
             self.symbol_edit.setText(symbol)
         else:
             self.symbol_edit.setText("No more symbols :)")
 
 
-
-    def error_lines (self, error_txt):
-
-        lines_list =[]
-
-
-        return lines_list
+    def extract_line_numbers(self, filename):
+        """
+        Extracts the numbers that follow the word "line" in each line of a text file,
+        and returns them as a list of integers.
+        """
+        line_numbers = []
+        with open(filename, "r") as file:
+            for line in file:
+                matches = re.findall(r"line\s+(\d+)", line)
+                if matches:
+                    line_numbers.append(int(matches[0])-1)
+        return line_numbers
 
 
 
@@ -183,10 +182,10 @@ class Window(QWidget):
             error = f.read()
         self.error_edit.append(error)
 
+        error_list = self.extract_line_numbers("error.txt")
+
+        self.syntax_highlight(error_list)
         if error != "":
-            error_list = self.error_lines(error)
-            error_list = [0,2]
-            self.syntax_highlight(error_list)
             self.quad_edit.setText("Error in code")
             self.symbol_edit.setText("Error in code")
             return
