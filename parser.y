@@ -5,6 +5,7 @@
 # include "parser.h"
 
 FILE* logFile;
+FILE* quadFile = NULL;
 extern int yylineno;
 
 void yyerror(char *s);
@@ -44,6 +45,10 @@ int checkKind (int kind);
 void setUsed(int i);
 
 /*my functions*/
+void printQuadLogInt(int);
+void printQuadLog(char*);
+char* getVariableID(char*);
+void pushIdentifier(char*);
 valueNode* setValueNode(int type, void* value);
 void addToSymbolTable(char* name , int type, int kind, valueNode* value);
 int inTable(char* name);
@@ -82,6 +87,8 @@ int update = 0;
 int activeFunctionType = -1;
 int switchType = -1;
 int loop = 0;
+int labelsId = 100;
+int isDoWhile = 0;
 %}
 
 /* Define yylval union */
@@ -141,7 +148,16 @@ int loop = 0;
 %start program
 
 %%
-
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 program: block_statements    
 	;
 
@@ -151,9 +167,8 @@ block_statements : block_statement
 block_statement : declaration ';'
 		| enum_usage ';'
         | expression ';'		
-		| do_while_statement ';'   
-		| if_condition block              %prec IFX
-		| if_condition block else_statement
+		| do_while_statement ';' 
+		| if_else_statement
 		| while_statement 
 		| for_statement 
 		| switch_statement  
@@ -401,7 +416,7 @@ term: term '*' factor       {$$ = Operations('*', $1, $3); }
     ;
 
 factor: value               {$$ = $1;}
-    | IDENTIFIER            {$$ = getIDValue($1);}
+    | IDENTIFIER            {$$ = getIDValue($1); pushIdentifier($1);}
     ;
 
 logical_expression:  '!' expression   { $$ = logicalOperations("!", $2, NULL); }
@@ -417,7 +432,7 @@ logical_expression:  '!' expression   { $$ = logicalOperations("!", $2, NULL); }
 
 value: INTEGER_TYPE  { $$ = setValueNode(typeInteger, &$1); }
 	| FLOAT_TYPE     { $$ = setValueNode(typeFloat, &$1); }
-	| BOOLEAN_TYPE   { $$ = setValueNode(typeFloat, &$1); }
+	| BOOLEAN_TYPE   { $$ = setValueNode(typeBoolean, &$1); }
 	| CHARACTER_TYPE { $$ = setValueNode(typeCharchter, &$1); }
 	| STRING_TYPE    { $$ = setValueNode(typeString, &$1); }
 	;
@@ -430,13 +445,30 @@ data_type: INT { $$ = typeInteger; }
 	;
 
 
-while_statement: while_declaraction {loop=1;} block {loop = 0;}
+while_statement: while_declaraction {loop=1;} block {
+	loop = 0; 
+	printQuadLog("JMP WHILE_BEGIN_"); printQuadLogInt(labelsId); printQuadLog("\n");
+	printQuadLog("END_WHILE_"); printQuadLogInt(labelsId); labelsId = labelsId + 10; printQuadLog(":\n");
+	}
 	;
 
-while_declaraction : WHILE 	{
+while_declaraction : 
+	{
+		if(isDoWhile == 0){
+			printQuadLog("WHILE_BEGIN_"); printQuadLogInt(labelsId); printQuadLog(":\n");
+		}
+	} 
+	WHILE 
+	{
 		if(activeFunctionType == -1)
 			printf("error: while/do while statement at line %d not in a function\n", yylineno);
-	}  '(' logical_expression ')'
+	}  
+	'(' logical_expression ')' 
+	{
+		if(isDoWhile == 0){
+			printQuadLog("JZ END_WHILE_"); printQuadLogInt(labelsId); printQuadLog("\n");
+		}
+	}
 	;
 
 
@@ -465,7 +497,17 @@ for_declaration: FOR '(' {scope++; loop=1;} variable_declaration  ';' logical_ex
 		| FOR '(' assignment  ';' logical_expression  ';' assignment ')'
 	;
 
-do_while_statement : DO {loop = 1;} block {loop=0;} while_declaraction
+do_while_statement : DO 
+					{
+						loop = 1; isDoWhile = 1;
+						printQuadLog("DO_WHILE_BEGIN_"); printQuadLogInt(labelsId); printQuadLog(":\n");
+					} 
+					block {loop=0;} while_declaraction
+					{
+						printQuadLog("JNZ DO_WHILE_BEGIN_"); printQuadLogInt(labelsId); printQuadLog("\n");
+						isDoWhile = 0;
+						labelsId = labelsId + 10;
+					}
 			;
 
 switch_statement : SWITCH '('expression')'
@@ -591,27 +633,80 @@ argument_call: argument_call ',' expression
 			| %empty {Args* args = (Args*)malloc(sizeof(Args)); args->nargs = 0; $$ = args;}
 			;
 
+if_else_statement: helper_if {printQuadLog("END_IF_"); printQuadLogInt(labelsId); labelsId = labelsId + 10; printQuadLog(":\n");}   %prec IFX 
+			| helper_if else_statement {printQuadLog("END_IF_"); printQuadLogInt(labelsId); labelsId = labelsId + 10; printQuadLog(":\n");}
 
+helper_if : if_condition block 
+				{
+					printQuadLog("JMP END_IF_"); printQuadLogInt(labelsId); printQuadLog("\n");
+					printQuadLog("ELSE_"); printQuadLogInt(labelsId); printQuadLog(":\n");
+				 }
 
 if_condition : IF {
 		if(activeFunctionType == -1)
 			printf("error: if statement near line %d not in a function\n", yylineno);
-	}  '(' logical_expression ')'         
+	}  '(' logical_expression ')'  {printQuadLog("JZ ELSE_"); printQuadLogInt(labelsId); printQuadLog("\n");}
 	;
 
-else_statement : ELSE block      
+else_statement : ELSE block
 		   ;
 
+
 %%
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 
 //-------------------------------------------------------------------------------------------------
 void yyerror(char *s) {
-    fprintf(stdout, "%s near line %d\n", s, yylineno);
+	fprintf(stdout, "%s near line %d\n", s, yylineno);
 }
 
 
 //--------------------------------------------------
 /* My functions*/
+void printQuadLogInt(int val){
+	if(quadFile == NULL){
+		quadFile=fopen("quad_log.log","w");
+	}
+	fprintf(quadFile, "%d",val);
+}
+void printQuadLog(char* str){
+	if(quadFile == NULL){
+		quadFile=fopen("quad_log.log","w");
+	}
+	fprintf(quadFile, "%s",str);
+}
+
+void pushIdentifier(char* iden){
+	printQuadLog("PUSHI ");
+	printQuadLog(getVariableID(iden));
+	printQuadLog("\n");
+}
+void quadLogValue(int type, void* value){
+	printQuadLog("PUSH ");
+	char str[40];
+	if (type == typeInteger)
+		sprintf(str, "%d", *((int *)value));
+	else if (type == typeFloat)
+		sprintf(str, "%f", *((float *)value));
+	else if (type == typeBoolean)
+		sprintf(str, "%d", *((int *)value));
+	else if (type == typeCharchter)
+		sprintf(str, "%c", *((char *)value));
+	else
+		sprintf(str, "%s", (char*)value);
+	printQuadLog(str);
+	printQuadLog("\n");
+}
+
 valueNode* setValueNode(int type, void* value){
 	valueNode* p = (valueNode*)malloc(sizeof(valueNode));
 	p->type = type;
@@ -625,6 +720,8 @@ valueNode* setValueNode(int type, void* value){
 		p->character = *((char *)value);
 	else
 		p->name = (char*)value;
+	
+	quadLogValue(type,value);
 	return p;
 }
 
@@ -751,6 +848,11 @@ void addToSymbolTable(char* name , int type, int kind, valueNode* value) {
 
 	// print the symbol table as CSV
 	printSymbolTableCSV();
+	if(value != NULL && (p.kind == identifierKind || p.kind == constantKind)){
+		printQuadLog("POPI ");
+		printQuadLog(getVariableID(name));
+		printQuadLog("\n");
+	}
 } 
 
 // this function is only used to check for declaration of variables
@@ -767,6 +869,25 @@ int inTableGlobal(char* name){
 		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope < scope  && symbol_table[i].isUsed == 1 && symbol_table[i].kind != functionKind && symbol_table[i].kind != enumKind)
 			return i;  
 	return -1;
+}
+
+char* getVariableID(char* name){
+	int maxScope = -1;
+	int maxi = -1 ;
+	for (int i =0;i < idx;i++)
+		if (!strcmp(name,symbol_table[i].name) && symbol_table[i].scope <= scope  && symbol_table[i].isUsed == 1 && symbol_table[i].kind != functionKind && symbol_table[i].kind != enumKind)
+			{
+				if(symbol_table[i].scope > maxScope){
+					maxScope = symbol_table[i].scope;
+					maxi = i;
+				}
+					
+			}
+	char* str = (char*) malloc (40*sizeof(char));
+	sprintf(str,"%d",maxi);
+	//TODO: %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+	return name;
+	return str;
 }
 
 int checkType(int x , valueNode* y , int errorType){
@@ -912,22 +1033,27 @@ valueNode* Operations (char operation,valueNode* par1, valueNode* par2) {
 		p->type = type1;
 		switch(operation) {
 			case '+': {
+				printQuadLog("ADD\n");
 				addOperation(p, par1, par2);
 				break;
 			}
 			case '-': {
+				printQuadLog("SUB\n");
 				subOperation(p, par1, par2);
 				break;
 			}
 			case '*': {
+				printQuadLog("MUL\n");
 				multiplyOperation(p, par1, par2);
 				break;
 			}
 			case '%': {
+				printQuadLog("MOD\n");
 				modeOperation(p, par1, par2);
 				break;
 			}
 			case '/': {
+				printQuadLog("DIV\n");
 				divideOperation(p, par1, par2);
 				break;
 			}
@@ -951,7 +1077,18 @@ void comparisonOperations(char* operation, valueNode* par1, valueNode* par2, val
 		case typeFloat: 
 		case typeBoolean: 
 		case typeCharchter:
-			// generate Quadruples
+			if(strcmp(operation, "==") == 0) 
+				printQuadLog("EQ\n");
+			else if(strcmp(operation, "!=") == 0) 
+				printQuadLog("NEQ\n");
+			else if(strcmp(operation, ">") == 0) 
+				printQuadLog("GT\n");
+			else if(strcmp(operation, "<") == 0) 
+				printQuadLog("LT\n");
+			else if(strcmp(operation, ">=") == 0) 
+				printQuadLog("GE\n");
+			else if(strcmp(operation, "<=") == 0) 
+				printQuadLog("LE\n");
 			break;
 		case typeString: {
 			if(strcmp(operation, "==") == 0) {
@@ -992,12 +1129,15 @@ valueNode* logicalOperations(char* operation, valueNode* par1, valueNode* par2) 
 		valueNode* p = (valueNode*)malloc(sizeof(valueNode));
 		p->type = typeBoolean;
 		if(strcmp(operation, "&&") == 0) {
+			printQuadLog("AND\n");
 			//p->boolean = par1->boolean && par2->boolean;
 		}
 		else if(strcmp(operation, "||") == 0) {
+			printQuadLog("OR\n");
 			//p->boolean = par1->boolean || par2->boolean;
 		}
 		else if(strcmp(operation, "!") == 0) {
+			printQuadLog("NOT\n");
 			//p->boolean = !par1->boolean;
 		}
 		else {
@@ -1095,7 +1235,9 @@ void updateSymbolTable(char* name, valueNode* value, int cast) {
 	
 	// print the symbol table as CSV
 	printSymbolTableCSV();	
-
+	printQuadLog("POPI ");
+	printQuadLog(getVariableID(name));
+	printQuadLog("\n");
 }
 
 // this function removes all variables with current scope from the symbol table using deallocation 
@@ -1121,12 +1263,12 @@ void printSymbolTableCSV() {
 	//update++;
 	//fprintf(logFile, "%d,", update);
 	// print the fields names
-	fprintf(logFile, "name, scope, type, kind, nargs, argsTypes, enum\n");
+	fprintf(logFile, "id, name, scope, type, kind, nargs, argsTypes, enum\n");
 	int i;
 	for (i = 0; i < idx; i++) {
 		// print each entry in the symbol table as a comma separated values regardelss of the value
 		if(symbol_table[i].kind == functionKind) {
-			fprintf(logFile, "%s, %d, %d, %d, %d, ", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].args->nargs);
+			fprintf(logFile, "%d, %s, %d, %d, %d, %d, ", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].args->nargs);
 			fprintf(logFile, "[ ");
 			for (int j = 0; j < symbol_table[i].args->nargs; j++) {
 				fprintf(logFile, "%d, ", symbol_table[i].args->types[j]);
@@ -1135,10 +1277,10 @@ void printSymbolTableCSV() {
 			fprintf(logFile, "NA\n");
 		}
 		else if(symbol_table[i].kind == constantKind && symbol_table[i].value != NULL && symbol_table[i].value->enumName != NULL) {
-			fprintf(logFile, "%s, %d, %d, %d, NA, NA, %s\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].value->enumName);
+			fprintf(logFile, "%d, %s, %d, %d, %d, NA, NA, %s\n", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind, symbol_table[i].value->enumName);
 		}
 		else {
-			fprintf(logFile, "%s, %d, %d, %d, NA, NA, NA\n", symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
+			fprintf(logFile, "%d, %s, %d, %d, %d, NA, NA, NA\n", i, symbol_table[i].name, symbol_table[i].scope, symbol_table[i].type, symbol_table[i].kind);
 		}
 
 	}

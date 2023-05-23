@@ -4,7 +4,8 @@
     #include "parser.tab.h"
     void yyerror(char *s);
     int yylex();
-
+    extern FILE* quadFile;
+    
     extern FILE* yyin;
 %}
 
@@ -105,11 +106,13 @@ int main(int argc, char* argv[]) {
     FILE* symbolTableFile = fopen("symbol_table.log", "w");
     fclose(symbolTableFile);
 
+    /* FILE* quadFile=fopen("quad_log.log","w"); */
     // Call the parser
     yyparse();
 
     // Close the input file
     fclose(inputFile);
+    fclose(quadFile);
 
     return 0;
 }

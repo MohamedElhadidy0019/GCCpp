@@ -7,3 +7,4 @@ parser.tab.c
 a.out
 .vscode
 a.exe
+quad_log.log
